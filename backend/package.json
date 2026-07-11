@@ -1,0 +1,14 @@
+{
+  "name": "masr-guide-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Masr Guide \u2014 multi-vendor tourism platform API (zero-dependency Node.js)",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node src/seed.js",
+    "reset": "node src/seed.js --reset",
+    "smoke": "bash test.sh"
+  }
+}

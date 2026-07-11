@@ -1,0 +1,45 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "Backend API base URL (e.g. https://your-api.com). Leave blank to use app default."
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      API_BASE: {{ github.event.inputs.api_base }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Flutter version
+        run: flutter --version
+      - name: Create platform folders (android/ios/...)
+        run: flutter create .
+      - name: Allow cleartext (http) traffic for LAN testing
+        run: sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+      - name: Get dependencies
+        run: flutter pub get
+      - name: Build release APK
+        run: |
+          if [ -n "$API_BASE" ]; then
+            flutter build apk --release --dart-define=API_BASE=$API_BASE
+          else
+            flutter build apk --release
+          fi
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: masr-guide-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
