@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' hide Category;
 import 'api.dart';
 import 'models.dart';
 
