@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state.dart';
+import '../models.dart';
 import '../theme.dart';
 import '../icons.dart';
 import '../widgets/common.dart';
@@ -147,20 +148,22 @@ class _CategoryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
-    final items = [
-      ('all', 'All'),
-      ...s.categories.map((c) => (c.key, c.name)),
-    ];
+    final List<String> keys = <String>['all'];
+    final List<String> names = <String>['All'];
+    for (final Category c in s.categories) {
+      keys.add(c.key);
+      names.add(c.name);
+    }
     return SizedBox(
       height: 84,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: items.length,
+        itemCount: keys.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (c, i) {
-          final key = items[i].$1;
-          final name = items[i].$2;
+        itemBuilder: (context, i) {
+          final String key = keys[i];
+          final String name = names[i];
           final active = s.selectedCat == key;
           return GestureDetector(
             onTap: () => context.read<AppState>().setCategory(key),
