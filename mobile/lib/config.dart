@@ -14,6 +14,6 @@
 class Config {
   static const String apiBase = String.fromEnvironment(
     'API_BASE',
-    defaultValue: 'http://10.0.2.2:4000',
+defaultValue: 'https://alert-benevolence-production-b766.up.railway.app',
   );
 }
