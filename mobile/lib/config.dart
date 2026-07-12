@@ -14,6 +14,6 @@
 class Config {
   static const String apiBase = String.fromEnvironment(
     'API_BASE',
-defaultValue: 'https://alert-benevolence-production-b766.up.railway.app',
+defaultValue: 'https://api.trendy-girl.com',
   );
 }
