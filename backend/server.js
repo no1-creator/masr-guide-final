@@ -71,7 +71,7 @@ const MIME = {
 
 async function serveStatic(res, pathname) {
 	try {
-		const rel = pathname === "/" ? "/index.html" : pathname
+const rel = pathname === "/" ? "/app.html" : pathname
 		const fp = join(PUBLIC_DIR, rel)
 		if (!fp.startsWith(PUBLIC_DIR)) return false
 		const st = await stat(fp)
