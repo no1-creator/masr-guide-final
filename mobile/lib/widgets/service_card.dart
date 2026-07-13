@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models.dart';
+import '../state.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -9,6 +11,7 @@ class ServiceCard extends StatelessWidget {
   const ServiceCard({super.key, required this.service, required this.onTap});
   @override
   Widget build(BuildContext context) {
+    final fav = context.watch<AppState>().isFav(service.id);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(kRadius),
@@ -27,6 +30,26 @@ class ServiceCard extends StatelessWidget {
                 AspectRatio(aspectRatio: 16 / 10, child: NetImage(service.cover)),
                 if (service.featured)
                   const Positioned(top: 8, left: 8, child: Pill('Featured', color: AppColors.gold)),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => context.read<AppState>().toggleFav(service.id),
+                      child: Padding(
+                        padding: const EdgeInsets.all(5),
+                        child: Icon(
+                          fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          size: 18,
+                          color: fav ? AppColors.red : AppColors.text2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             Padding(
