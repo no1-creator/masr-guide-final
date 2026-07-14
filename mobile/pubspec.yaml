@@ -1,5 +1,5 @@
 name: masr_guide_app
-description: "Masr Guide - tourist services mobile app (Flutter), connected to the same backend API and database as the web control panel."
+description: "RaGo - tourist services in Egypt (Flutter app), connected to the same backend API and database as the web control panel."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -19,6 +19,17 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/rago.png"
+  adaptive_icon_background: "#123B4C"
+  adaptive_icon_foreground: "assets/icon/rago-foreground.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/
