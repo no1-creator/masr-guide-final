@@ -48,12 +48,20 @@ class _HomeScreenState extends State<HomeScreen> {
               title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: AppColors.blueSoft, borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.travel_explore_rounded, color: AppColors.blue, size: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(9)),
+                    child: const Text('R', style: TextStyle(color: AppColors.cream, fontWeight: FontWeight.w800, fontSize: 16, height: 1.0)),
                   ),
                   const SizedBox(width: 8),
-                  const Text('Masr Guide', style: TextStyle(fontWeight: FontWeight.w700)),
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 0.2),
+                      children: [
+                        TextSpan(text: 'Ra', style: TextStyle(color: AppColors.blue)),
+                        TextSpan(text: 'Go', style: TextStyle(color: AppColors.orange)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
