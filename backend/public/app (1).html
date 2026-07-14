@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masr Guide — Explore Egypt</title>
+<style>
+:root{--blue:#159A8F;--blue-soft:#E2F3F0;--blue-h:#0F847A;--green:#46A171;--green-soft:#E8F1EC;--gold:#C79A3B;--orange:#D5803B;--orange-soft:#FBEBDE;--red:#E56458;--text:#2C2C2B;--text2:#7D7A75;--border:#E6E5E3;--soft:#F9F8F7;--soft2:#F0EFED;--r:12px;--r-sm:8px}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--soft)}
+a{color:var(--blue);text-decoration:none}
+.container{max-width:1160px;margin:0 auto;padding:0 20px}
+header{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.hdr{display:flex;align-items:center;gap:16px;height:64px}
+.brand{font-weight:800;font-size:20px;color:var(--blue);display:flex;align-items:center;gap:8px;cursor:pointer}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--gold)}
+.grow{flex:1}
+.btn{border:none;border-radius:var(--r-sm);padding:9px 16px;font-weight:600;font-size:14px;cursor:pointer;background:var(--blue);color:#fff}
+.btn:hover{background:var(--blue-h)}
+.btn.ghost{background:var(--soft2);color:var(--text)}
+.btn.ghost:hover{background:var(--border)}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn.danger{background:var(--red)}
+.chip{display:inline-flex;align-items:center;gap:8px;background:var(--blue-soft);color:var(--blue-h);border-radius:999px;padding:6px 14px;font-weight:600;font-size:13px}
+.tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.tag.pending,.tag.requested{background:var(--orange-soft);color:var(--orange)}
+.tag.confirmed{background:var(--blue-soft);color:var(--blue-h)}
+.tag.completed,.tag.paid{background:var(--green-soft);color:var(--green)}
+.tag.cancelled{background:#f4dddd;color:var(--red)}
+.tag.approved{background:var(--green-soft);color:var(--green)}
+.tag.rejected{background:#f4dddd;color:var(--red)}
+.tag.suspended{background:var(--soft2);color:var(--text2)}
+section{padding:26px 0}
+h2{font-size:22px;margin:0 0 4px}
+.eyebrow{color:var(--blue);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.muted{color:var(--text2)}
+.slider{position:relative;border-radius:var(--r);overflow:hidden;height:260px;background:#ddd;margin-bottom:8px}
+.slide{position:absolute;inset:0;opacity:0;transition:opacity .5s;background-size:cover;background-position:center;cursor:pointer}
+.slide.on{opacity:1}
+.slide .cap{position:absolute;left:0;right:0;bottom:0;padding:40px 26px 20px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff}
+.slide .cap h3{margin:0 0 6px;font-size:24px}
+.dots{position:absolute;bottom:14px;right:20px;display:flex;gap:8px}
+.dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.5);cursor:pointer}
+.dots i.on{background:#fff}
+.snav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.85);border:none;font-size:18px;cursor:pointer}
+.snav.l{left:14px}.snav.r{right:14px}
+.cats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.cat{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:8px 15px;font-weight:600;font-size:13px;cursor:pointer;transition:.15s}
+.cat:hover{border-color:var(--blue);color:var(--blue)}
+.cat .ci{width:16px;height:16px;flex:0 0 auto}
+.cat.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 18px}
+.filters input,.filters select{padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:14px}
+.filters input{flex:1;min-width:180px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.08)}
+.card .img{height:160px;background-size:cover;background-position:center;background-color:#e9e9e9;position:relative}
+.card .feat{position:absolute;top:10px;left:10px;background:var(--gold);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px}
+.card .body{padding:14px}
+.card .t{font-weight:700;margin:0 0 4px}
+.card .loc{color:var(--text2);font-size:13px}
+.card .meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.card .price{font-weight:800;color:var(--blue)}
+.card .price small{font-weight:500;color:var(--text2)}
+.star{color:var(--gold);font-weight:700;font-size:13px}
+.hero{height:300px;border-radius:var(--r);background-size:cover;background-position:center;background-color:#e9e9e9;margin-bottom:10px}
+.gallery{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.gth{width:92px;height:64px;border-radius:var(--r-sm);background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent}
+.gth.on{border-color:var(--blue)}
+.two{display:grid;grid-template-columns:1fr 320px;gap:24px}
+.box{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.dash{display:grid;grid-template-columns:220px 1fr;gap:20px;align-items:start}
+.dnav{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:10px}
+.dnav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:none;background:none;padding:10px 12px;border-radius:var(--r-sm);font-weight:600;font-size:14px;cursor:pointer;color:var(--text)}
+.dnav button:hover{background:var(--soft)}
+.dnav button.on{background:var(--blue-soft);color:var(--blue-h)}
+.dnav .ci{width:18px;height:18px;flex:0 0 auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.stat .n{font-size:26px;font-weight:800;color:var(--blue)}
+.stat .l{color:var(--text2);font-size:13px;margin-top:2px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);font-size:14px}
+th{background:var(--soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)}
+tr:last-child td{border-bottom:none}
+code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.overlay.on{display:flex}
+.modal{background:#fff;border-radius:var(--r);max-width:520px;width:100%;max-height:90vh;overflow:auto;padding:24px}
+.modal h3{margin:0 0 16px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.imgs .th{position:relative;width:76px;height:56px;border-radius:6px;background-size:cover;background-position:center;background-color:#eee}
+.imgs .th b{position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;width:18px;height:18px;border-radius:50%;font-size:12px;line-height:18px;text-align:center;cursor:pointer}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 20px;border-radius:var(--r-sm);z-index:200;opacity:0;transition:opacity .3s;font-size:14px}
+.toast.on{opacity:1}
+.hidden{display:none!important}
+.qr{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;display:inline-block}
+.linkbox{display:flex;gap:8px;margin-top:8px}
+.linkbox input{flex:1;font-family:monospace;font-size:13px}
+@media(max-width:860px){.two{grid-template-columns:1fr}.dash{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="container hdr">
+  <div class="brand" onclick="goHome()"><span class="dot"></span> Masr Guide</div>
+  <span class="muted" style="font-size:13px">Trips &amp; experiences across Egypt</span>
+  <div class="grow"></div>
+  <button class="btn ghost sm hidden" id="dash-btn" onclick="openDash()">Dashboard</button>
+  <span id="user-chip"></span>
+  <button class="btn sm" id="login-btn" onclick="openLogin()">Log in</button>
+</div></header>
+
+<main class="container">
+  <div id="public-view">
+    <section>
+      <div class="slider" id="slider"></div>
+    </section>
+    <section style="padding-top:0">
+      <div class="eyebrow">Explore Egypt</div>
+      <h2>Everything a traveller needs — from landing to takeoff</h2>
+      <p class="muted" style="margin:2px 0 0">Browse trusted providers across trips, tours, transfers, stays and more.</p>
+      <div class="cats" id="cats"></div>
+      <div class="filters">
+        <input id="q" placeholder="Search trips, cities..." oninput="debouncedLoad()">
+        <select id="sort" onchange="loadServices()">
+          <option value="">Recommended</option>
+          <option value="price_asc">Price: low to high</option>
+          <option value="price_desc">Price: high to low</option>
+          <option value="rating">Top rated</option>
+          <option value="newest">Newest</option>
+        </select>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </div>
+
+  <div id="detail-view" class="hidden"><section>
+    <button class="btn ghost sm" onclick="goHome()">&larr; Back</button>
+    <div id="detail-body" style="margin-top:14px"></div>
+  </section></div>
+
+  <div id="dash-view" class="hidden"><section>
+    <button class="btn ghost sm" onclick="goHome()">&larr; Back to site</button>
+    <h2 style="margin-top:12px" id="dash-title">Dashboard</h2>
+    <div class="dash" style="margin-top:14px">
+      <div class="dnav" id="dnav"></div>
+      <div id="dmain"></div>
+    </div>
+  </section></div>
+</main>
+
+<div class="overlay" id="login-modal"><div class="modal">
+  <h3 id="login-title">Log in</h3>
+  <div id="login-body">
+    <div class="field"><label>Email</label><input id="li-email" placeholder="admin@masrguide.com"></div>
+    <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="admin123"></div>
+    <div id="reg-extra" class="hidden">
+      <div class="field"><label>Name</label><input id="li-name"></div>
+      <div class="field"><label>Account type</label><select id="li-role"><option value="customer">Tourist</option><option value="vendor">Service provider</option></select></div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn" id="li-submit" onclick="doAuth()">Log in</button>
+      <button class="btn ghost" onclick="closeModal('login-modal')">Cancel</button>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:14px" id="li-switch"></p>
+    <p class="muted" style="font-size:12px;margin-top:8px">Demo: admin@masrguide.com / admin123 &middot; vendor@rodina.com / vendor123 &middot; ivan@aff.com / aff123 &middot; tourist@example.com / tourist123</p>
+  </div>
+</div></div>
+
+<div class="overlay" id="book-modal"><div class="modal">
+  <h3>Book this trip</h3>
+  <div class="field"><label>Date</label><input id="bk-date" type="date"></div>
+  <div class="field"><label>Guests</label><input id="bk-pax" type="number" value="1" min="1"></div>
+  <p class="muted" id="bk-ref" style="font-size:13px"></p>
+  <div class="row"><button class="btn" onclick="submitBooking()">Confirm booking</button><button class="btn ghost" onclick="closeModal('book-modal')">Cancel</button></div>
+</div></div>
+
+<div class="overlay" id="svc-modal"><div class="modal">
+  <h3 id="svc-title">New service</h3>
+  <input type="hidden" id="sf-id">
+  <div class="field"><label>Title</label><input id="sf-title"></div>
+  <div class="row">
+    <div class="field"><label>Category</label><select id="sf-cat"></select></div>
+    <div class="field"><label>Location</label><input id="sf-loc"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Price (EGP)</label><input id="sf-price" type="number"></div>
+    <div class="field"><label>Duration</label><input id="sf-dur" placeholder="8h"></div>
+  </div>
+  <div class="field"><label>Description</label><textarea id="sf-desc" rows="3"></textarea></div>
+  <div class="field"><label>Images (unlimited)</label>
+    <input type="file" id="sf-file" accept="image/*" multiple onchange="sfUpload(event)">
+    <div class="imgs" id="sf-imgs"></div>
+  </div>
+  <label style="font-size:13px"><input type="checkbox" id="sf-feat"> Featured</label>
+  <div class="row" style="margin-top:14px"><button class="btn" onclick="saveService()">Save</button><button class="btn ghost" onclick="closeModal('svc-modal')">Cancel</button></div>
+</div></div>
+
+<div class="overlay" id="mkt-modal"><div class="modal">
+  <h3>New marketer</h3>
+  <div class="field"><label>Name</label><input id="mk-name"></div>
+  <div class="field"><label>Email</label><input id="mk-email"></div>
+  <div class="row">
+    <div class="field"><label>Password</label><input id="mk-pass" placeholder="changeme123"></div>
+    <div class="field"><label>Commission %</label><input id="mk-rate" type="number" value="5"></div>
+  </div>
+  <div class="field"><label>Referral code (optional)</label><input id="mk-code" placeholder="auto"></div>
+  <div class="row" style="margin-top:6px"><button class="btn" onclick="saveMarketer()">Create</button><button class="btn ghost" onclick="closeModal('mkt-modal')">Cancel</button></div>
+</div></div>
+
+<div class="overlay" id="ban-modal"><div class="modal">
+  <h3 id="ban-title">New banner</h3>
+  <input type="hidden" id="bn-id">
+  <div class="field"><label>Title</label><input id="bn-title"></div>
+  <div class="field"><label>Image URL</label><input id="bn-image" placeholder="/img/redsea.png"></div>
+  <div class="field"><label>Links to trip</label><select id="bn-svc"></select></div>
+  <label style="font-size:13px"><input type="checkbox" id="bn-active" checked> Active</label>
+  <div class="row" style="margin-top:14px"><button class="btn" onclick="saveBanner()">Save</button><button class="btn ghost" onclick="closeModal('ban-modal')">Cancel</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API='';
+let TOKEN=localStorage.getItem('mg_token')||'';
+let USER=JSON.parse(localStorage.getItem('mg_user')||'null');
+let REF=localStorage.getItem('mg_ref')||'';
+let CATS=[],CUR_CAT='',CUR_SVC=null,SF_IMGS=[],LOGIN_MODE='login';
+
+(()=>{const u=new URL(location.href);const r=u.searchParams.get('ref');if(r){REF=r;localStorage.setItem('mg_ref',r);api('/api/track/'+encodeURIComponent(r),{method:'POST'}).catch(()=>{});}})();
+
+async function api(path,opts={}){
+  const h={'Content-Type':'application/json'};
+  if(TOKEN) h['Authorization']='Bearer '+TOKEN;
+  const res=await fetch(API+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error||('HTTP '+res.status));
+  return data;
+}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+function closeModal(id){document.getElementById(id).classList.remove('on');}
+function openModal(id){document.getElementById(id).classList.add('on');}
+function money(n){return Number(n||0).toLocaleString()+' EGP';}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function v(id){return document.getElementById(id).value;}
+
+function renderAuth(){
+  const chip=document.getElementById('user-chip'),lb=document.getElementById('login-btn'),db=document.getElementById('dash-btn');
+  if(USER){chip.innerHTML=`<span class="chip">${esc(USER.name||USER.email)} &middot; ${USER.role}</span>`;lb.textContent='Log out';lb.onclick=logout;db.classList.toggle('hidden',USER.role==='customer');}
+  else{chip.innerHTML='';lb.textContent='Log in';lb.onclick=openLogin;db.classList.add('hidden');}
+}
+function openLogin(){setLoginMode('login');openModal('login-modal');}
+function setLoginMode(mode){LOGIN_MODE=mode;syncLogin();}
+function syncLogin(){
+  const reg=LOGIN_MODE==='register';
+  document.getElementById('login-title').textContent=reg?'Create account':'Log in';
+  document.getElementById('li-submit').textContent=reg?'Sign up':'Log in';
+  document.getElementById('reg-extra').classList.toggle('hidden',!reg);
+  document.getElementById('li-switch').innerHTML=reg?`Have an account? <a href="#" onclick="setLoginMode('login');return false">Log in</a>`:`New here? <a href="#" onclick="setLoginMode('register');return false">Create account</a>`;
+}
+async function doAuth(){
+  const email=document.getElementById('li-email').value.trim(),password=document.getElementById('li-pass').value;
+  try{
+    let r;
+    if(LOGIN_MODE==='register'){r=await api('/api/auth/register',{method:'POST',body:{email,password,name:document.getElementById('li-name').value,role:document.getElementById('li-role').value}});}
+    else{r=await api('/api/auth/login',{method:'POST',body:{email,password}});}
+    TOKEN=r.token;USER=r.user;localStorage.setItem('mg_token',TOKEN);localStorage.setItem('mg_user',JSON.stringify(USER));
+    closeModal('login-modal');renderAuth();toast('Welcome, '+(USER.name||USER.email));
+    if(USER.role!=='customer') openDash();
+  }catch(e){toast(e.message);}
+}
+function logout(){TOKEN='';USER=null;localStorage.removeItem('mg_token');localStorage.removeItem('mg_user');renderAuth();goHome();}
+
+function goHome(){show('public-view');}
+function show(id){['public-view','detail-view','dash-view'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));window.scrollTo(0,0);}
+
+let SLIDES=[],slideI=0,slideTimer=null;
+async function loadSlider(){
+  try{SLIDES=await api('/api/banners');}catch{SLIDES=[];}
+  const s=document.getElementById('slider');
+  if(!SLIDES.length){s.style.display='none';return;}
+  s.style.display='block';
+  s.innerHTML=SLIDES.map((b,i)=>`<div class="slide ${i===0?'on':''}" style="background-image:url('${b.image||''}')" onclick="${b.service&&b.service.id?`openDetail(${b.service.id})`:''}"><div class="cap"><h3>${esc(b.title)}</h3>${b.service?`<span class="chip">Book now &rarr;</span>`:''}</div></div>`).join('')
+    +`<button class="snav l" onclick="slideBy(-1)">&lsaquo;</button><button class="snav r" onclick="slideBy(1)">&rsaquo;</button>`
+    +`<div class="dots">${SLIDES.map((b,i)=>`<i class="${i===0?'on':''}" onclick="slideTo(${i})"></i>`).join('')}</div>`;
+  slideI=0;clearInterval(slideTimer);slideTimer=setInterval(()=>slideBy(1),5000);
+}
+function slideTo(i){slideI=(i+SLIDES.length)%SLIDES.length;document.querySelectorAll('#slider .slide').forEach((el,x)=>el.classList.toggle('on',x===slideI));document.querySelectorAll('#slider .dots i').forEach((el,x)=>el.classList.toggle('on',x===slideI));}
+function slideBy(d){slideTo(slideI+d);}
+
+const ICONS={
+  all:`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>`,
+  plane:`<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>`,
+  file:`<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>`,
+  car:`<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>`,
+  bed:`<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>`,
+  compass:`<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>`,
+  landmark:`<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>`,
+  ship:`<path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76"/><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M12 10v4"/><path d="M12 2v3"/>`,
+  waves:`<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2"/>`,
+  mountain:`<path d="m3 20 6.5-13 4 8 2.5-4L21 20z"/>`,
+  key:`<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>`,
+  user:`<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`,
+  phone:`<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>`,
+  utensils:`<path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>`,
+  bag:`<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>`,
+  sparkles:`<path d="M9.94 14.06A2 2 0 0 0 8.5 12.63L3.4 11.3a.5.5 0 0 1 0-.96l5.1-1.33A2 2 0 0 0 9.94 7.6l1.32-5.1a.5.5 0 0 1 .96 0l1.33 5.1a2 2 0 0 0 1.44 1.44l5.1 1.32a.5.5 0 0 1 0 .96l-5.1 1.33a2 2 0 0 0-1.44 1.44l-1.32 5.1a.5.5 0 0 1-.96 0z"/>`,
+  ticket:`<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>`,
+  shield:`<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>`,
+  luggage:`<path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2"/><path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14"/><path d="M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/>`,
+  grid:`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>`,
+  store:`<path d="M2 7l1.5-4h17L22 7"/><path d="M4 7v13a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V7"/><path d="M2 7h20"/><path d="M9 21v-6h6v6"/>`,
+  image:`<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>`,
+  megaphone:`<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>`,
+  users:`<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
+  star:`<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
+  wallet:`<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="17" cy="14" r="1"/>`,
+  settings:`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>`,
+  link:`<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>`,
+};
+function iconSvg(n){return `<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.compass}</svg>`;}
+const NAVICON={overview:'grid',vendors:'store',services:'compass',banners:'image',marketers:'megaphone',bookings:'ticket',customers:'users',reviews:'star',payouts:'wallet',settings:'settings',wallet:'wallet',profile:'user',link:'link'};
+
+async function loadCats(){
+  try{CATS=await api('/api/categories');}catch{CATS=[];}
+  document.getElementById('cats').innerHTML=`<div class="cat ${CUR_CAT===''?'on':''}" onclick="pickCat('')">${iconSvg('all')}All</div>`+CATS.map(c=>`<div class="cat ${CUR_CAT===c.key?'on':''}" onclick="pickCat('${c.key}')">${iconSvg(c.icon)}${esc((c.labels&&c.labels.en)||c.key)}</div>`).join('');
+}
+function pickCat(k){CUR_CAT=k;loadCats();loadServices();}
+let dbT=null;function debouncedLoad(){clearTimeout(dbT);dbT=setTimeout(loadServices,300);}
+async function loadServices(){
+  const q=document.getElementById('q').value,sort=document.getElementById('sort').value;
+  const params=new URLSearchParams();if(CUR_CAT)params.set('cat',CUR_CAT);if(q)params.set('q',q);if(sort)params.set('sort',sort);
+  let list=[];try{list=await api('/api/services?'+params.toString());}catch{list=[];}
+  document.getElementById('grid').innerHTML=list.map(s=>`<div class="card" onclick="openDetail(${s.id})"><div class="img" style="background-image:url('${s.cover||(s.images&&s.images[0])||''}')">${s.featured?`<span class="feat">Featured</span>`:''}</div><div class="body"><div class="t">${esc(s.title)}</div><div class="loc">&#128205; ${esc(s.location)}</div><div class="meta"><span class="star">&#9733; ${s.rating} <span class="muted">(${s.reviews_count})</span></span><span class="price">${money(s.price)} <small>/ ${esc(s.duration||'')}</small></span></div></div></div>`).join('')||`<p class="muted">No trips found.</p>`;
+}
+async function openDetail(id){
+  const s=await api('/api/services/'+id);CUR_SVC=s;
+  const imgs=s.images&&s.images.length?s.images:[s.cover].filter(Boolean);
+  let reviews=[];try{reviews=await api('/api/reviews?service_id='+id);}catch{}
+  document.getElementById('detail-body').innerHTML=`<div class="two"><div>
+    <div class="hero" id="d-hero" style="background-image:url('${imgs[0]||''}')"></div>
+    <div class="gallery">${imgs.map((u,i)=>`<div class="gth ${i===0?'on':''}" style="background-image:url('${u}')" onclick="heroPick(${i})"></div>`).join('')}</div>
+    <div class="eyebrow">${esc(s.vendor?s.vendor.name:'')}</div>
+    <h2>${esc(s.title)}</h2>
+    <p class="muted">&#128205; ${esc(s.location)} &middot; &#9201; ${esc(s.duration||'')} &middot; <span class="star">&#9733; ${s.rating}</span> (${s.reviews_count})</p>
+    <p>${esc(s.description)}</p>
+    <h3>Availability</h3><p class="muted">${(s.availability||[]).slice(0,8).map(a=>a.date).join(' &middot; ')||'Contact provider'}</p>
+    <h3>Reviews (${reviews.length})</h3>${reviews.length?reviews.map(r=>`<div class="box" style="margin-bottom:8px"><span class="star">&#9733; ${r.rating}</span> ${esc(r.comment||'')}<div class="muted" style="font-size:13px">&mdash; ${esc(r.name||'Guest')}</div></div>`).join(''):`<p class="muted">No reviews yet.</p>`}
+  </div>
+  <div><div class="box">
+    <div class="price" style="font-size:26px;font-weight:800;color:var(--blue)">${money(s.price)}</div>
+    <div class="muted">per person</div>
+    <button class="btn" style="width:100%;margin-top:12px" onclick="openBooking()">Book now</button>
+    ${REF?`<p class="muted" style="font-size:13px;margin-top:8px">Referral: ${esc(REF)}</p>`:''}
+  </div></div></div>`;
+  window.__imgs=imgs;show('detail-view');
+}
+function heroPick(i){document.getElementById('d-hero').style.backgroundImage="url('"+window.__imgs[i]+"')";document.querySelectorAll('#detail-view .gth').forEach((e,x)=>e.classList.toggle('on',x===i));}
+function openBooking(){if(!USER){toast('Please log in to book');openLogin();return;}document.getElementById('bk-ref').textContent=REF?('Referral code applied: '+REF):'';openModal('book-modal');}
+async function submitBooking(){
+  try{const b=await api('/api/bookings',{method:'POST',body:{service_id:CUR_SVC.id,date:document.getElementById('bk-date').value||null,pax:Number(document.getElementById('bk-pax').value)||1,referral_code:REF||null}});
+  closeModal('book-modal');toast('Booked! Ref '+b.ref);}catch(e){toast(e.message);}
+}
+
+const NAV={admin:['overview','vendors','services','bookings','customers','reviews','banners','marketers','payouts','settings'],vendor:['overview','services','marketers','bookings','wallet','profile'],affiliate:['overview','link','bookings','wallet']};
+let DSEC='overview';
+function openDash(){if(!USER||USER.role==='customer'){toast('No dashboard for this role');return;}DSEC='overview';document.getElementById('dash-title').textContent=({admin:'Admin',vendor:'Provider',affiliate:'Marketer'}[USER.role])+' Dashboard';renderNav();show('dash-view');loadSec();}
+function renderNav(){document.getElementById('dnav').innerHTML=NAV[USER.role].map(s=>`<button class="${s===DSEC?'on':''}" onclick="navTo('${s}')">${iconSvg(NAVICON[s]||'compass')}<span>${s[0].toUpperCase()+s.slice(1)}</span></button>`).join('');}
+function navTo(s){DSEC=s;renderNav();loadSec();}
+function card(html){return `<div class="box">${html}</div>`;}
+async function loadSec(){
+  const m=document.getElementById('dmain');m.innerHTML=`<p class="muted">Loading...</p>`;
+  try{await SEC[USER.role+':'+DSEC](m);}catch(e){m.innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+const SEC={
+  'admin:overview':async(m)=>{const o=await api('/api/admin/overview');m.innerHTML=`<div class="stats">
+    <div class="stat"><div class="n">${o.vendors}</div><div class="l">Providers</div></div>
+    <div class="stat"><div class="n">${o.services}</div><div class="l">Services</div></div>
+    <div class="stat"><div class="n">${o.affiliates}</div><div class="l">Marketers</div></div>
+    <div class="stat"><div class="n">${o.customers}</div><div class="l">Customers</div></div>
+    <div class="stat"><div class="n">${o.bookings}</div><div class="l">Bookings</div></div>
+    <div class="stat"><div class="n">${money(o.revenue)}</div><div class="l">Revenue</div></div>
+    <div class="stat"><div class="n">${money(o.platform_commission)}</div><div class="l">Platform commission</div></div>
+    <div class="stat"><div class="n">${o.pending_payouts}</div><div class="l">Pending payouts</div></div>
+  </div>
+  <h3 style="margin:6px 0 8px">Recent bookings</h3>${tbl(['Ref','Trip','Amount','Status'],o.recent_bookings.map(b=>[b.ref,esc(b.title),money(b.amount),statusTag(b.status)]))}
+  <h3 style="margin:20px 0 8px">Top marketers</h3>${tbl(['Name','Code','Clicks','Bookings'],o.top_affiliates.map(a=>[esc(a.name),a.code,a.clicks,a.bookings]))}`;},
+  'admin:vendors':async(m)=>{const v=await api('/api/vendors');m.innerHTML=`<h3 style="margin:0 0 12px">Service providers</h3>`+tbl(['Name','City','Email','Status','Action'],v.map(x=>[esc(x.name),esc(x.city||''),esc(x.email),statusTag(x.status),`<button class="btn sm" onclick="setVendor(${x.id},'approved')">Approve</button> <button class="btn sm ghost" onclick="setVendor(${x.id},'suspended')">Suspend</button>`]));},
+  'admin:services':async(m)=>{await ensureCats();const s=await api('/api/services');m.innerHTML=`<h3 style="margin:0 0 12px">All services (${s.length})</h3>`+tbl(['Title','Category','Location','Price','Rating','Action'],s.map(x=>[esc(x.title),catName(x.category_id),esc(x.location),money(x.price),'★ '+x.rating,`<button class="btn sm danger" onclick="delService(${x.id})">Delete</button>`]));},
+  'admin:bookings':async(m)=>{const b=await api('/api/bookings');m.innerHTML=`<h3 style="margin:0 0 12px">All bookings</h3>`+bookingsTable(b);},
+  'admin:customers':async(m)=>{const c=await api('/api/admin/customers');m.innerHTML=`<h3 style="margin:0 0 12px">Customers (${c.length})</h3>`+tbl(['Name','Email','Lang','Bookings','Spent','Joined'],c.map(x=>[esc(x.name||'—'),esc(x.email||''),String(x.lang||'—').toUpperCase(),x.bookings,money(x.spent),String(x.created_at||'').slice(0,10)]));},
+  'admin:reviews':async(m)=>{const r=await api('/api/admin/reviews');m.innerHTML=`<h3 style="margin:0 0 12px">Reviews (${r.length})</h3>`+tbl(['Service','Rating','Comment','By','Date','Action'],r.map(x=>[esc(x.service_title||'—'),'★ '+x.rating,esc(x.comment||''),esc(x.name||'Guest'),String(x.created_at||'').slice(0,10),`<button class="btn sm danger" onclick="delReview(${x.id})">Delete</button>`]));},
+  'admin:banners':async(m)=>{const b=await api('/api/banners?all=1');m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Ad banners</h3><button class="btn sm" onclick="openBanner()">+ New banner</button></div>`+tbl(['Title','Trip','Active','Action'],b.map(x=>[esc(x.title),x.service?esc(x.service.title):'—',x.active?'✅':'—',`<button class="btn sm ghost" onclick="openBanner(${x.id})">Edit</button> <button class="btn sm danger" onclick="delBanner(${x.id})">Delete</button>`]));},
+  'admin:marketers':async(m)=>{const a=await api('/api/affiliates');m.innerHTML=`<h3 style="margin:0 0 12px">All marketers</h3>`+tbl(['Name','Code','Rate','Clicks'],a.map(x=>[esc(x.name),x.code,(x.commission_rate*100)+'%',x.clicks]));},
+  'admin:payouts':async(m)=>{const p=await api('/api/payouts');m.innerHTML=`<h3 style="margin:0 0 12px">Payout requests</h3>`+tbl(['#','Owner','Amount','Status','Requested','Action'],p.map(x=>[x.id,`${esc(x.owner_type||'')} #${x.owner_id}`,money(x.amount),statusTag(x.status),String(x.requested_at||'').slice(0,10),payoutActions(x)]));},
+  'admin:settings':async(m)=>{const list=await api('/api/admin/settings');const cur={};list.forEach(s=>cur[s.key]=s.value);const known=[['site_name','Site name'],['platform_commission_rate','Platform commission rate (e.g. 0.10)'],['affiliate_default_rate','Default marketer rate (e.g. 0.05)'],['currency','Currency code'],['support_email','Support email'],['whatsapp','WhatsApp number']];const keys=[...new Set([...known.map(k=>k[0]),...Object.keys(cur)])];const labelOf=k=>{const f=known.find(x=>x[0]===k);return f?f[1]:k.replace(/_/g,' ');};m.innerHTML=card(`<h3 style="margin:0 0 12px">Platform settings</h3>`+keys.map(k=>`<div class="field"><label>${esc(labelOf(k))}</label><input id="set-${k}" value="${esc(cur[k]==null?'':cur[k])}"></div>`).join('')+`<button class="btn" style="margin-top:6px" onclick='saveSettings(${JSON.stringify(keys)})'>Save settings</button>`);},
+  'vendor:overview':async(m)=>{const b=await api('/api/bookings');const w=await api('/api/wallets/me').catch(()=>({balance:0}));const rev=b.reduce((s,x)=>s+x.amount,0);m.innerHTML=`<div class="stats"><div class="stat"><div class="n">${b.length}</div><div class="l">Bookings</div></div><div class="stat"><div class="n">${money(rev)}</div><div class="l">Gross sales</div></div><div class="stat"><div class="n">${money(w.balance)}</div><div class="l">Wallet balance</div></div></div><h3 style="margin:6px 0 8px">Recent bookings</h3>`+bookingsTable(b.slice(0,8));},
+  'vendor:services':async(m)=>{await ensureCats();const all=await api('/api/services');const me=await api('/api/vendors/me').catch(()=>null);const mine=me?all.filter(s=>s.vendor_id===me.id):all;m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">My services</h3><button class="btn sm" onclick="openService()">+ New service</button></div>`+tbl(['Title','Category','Price','Images','Action'],mine.map(s=>[esc(s.title),catName(s.category_id),money(s.price),(s.images?s.images.length:0),`<button class="btn sm ghost" onclick="openService(${s.id})">Edit</button> <button class="btn sm danger" onclick="delService(${s.id})">Delete</button>`]));},
+  'vendor:marketers':async(m)=>{const a=await api('/api/affiliates');m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">My marketers</h3><button class="btn sm" onclick="openModal('mkt-modal')">+ New marketer</button></div>`+tbl(['Name','Code','Rate','Clicks','Action'],a.map(x=>[esc(x.name),x.code,(x.commission_rate*100)+'%',x.clicks,`<button class="btn sm danger" onclick="delAff(${x.id})">Remove</button>`]));},
+  'vendor:bookings':async(m)=>{const b=await api('/api/bookings');m.innerHTML=`<h3 style="margin:0 0 12px">Bookings</h3>`+bookingsTable(b,true);},
+  'vendor:wallet':async(m)=>{await walletView(m);},
+  'vendor:profile':async(m)=>{const v=await api('/api/vendors/me');m.innerHTML=card(`<h3 style="margin:0 0 12px">Business profile</h3><div class="field"><label>Name</label><input id="vp-name" value="${esc(v.name||'')}"></div><div class="field"><label>City</label><input id="vp-city" value="${esc(v.city||'')}"></div><div class="field"><label>Languages</label><input id="vp-langs" value="${esc(v.languages||'')}"></div><div class="field"><label>Description</label><textarea id="vp-desc" rows="3">${esc(v.description||'')}</textarea></div><button class="btn" onclick="saveProfile()">Save profile</button>`);},
+  'affiliate:overview':async(m)=>{const a=await api('/api/affiliates/me');const b=await api('/api/bookings');const w=await api('/api/wallets/me').catch(()=>({balance:0}));m.innerHTML=`<div class="stats"><div class="stat"><div class="n">${a.clicks}</div><div class="l">Clicks</div></div><div class="stat"><div class="n">${b.length}</div><div class="l">Bookings</div></div><div class="stat"><div class="n">${money(w.balance)}</div><div class="l">Earnings</div></div></div>`;},
+  'affiliate:link':async(m)=>{const a=await api('/api/affiliates/me');const link=a.link;m.innerHTML=card(`<h3 style="margin:0 0 8px">Your referral link</h3><div class="linkbox"><input id="aff-link" value="${esc(link)}" readonly><button class="btn" onclick="copyLink()">Copy</button></div><div style="margin-top:14px">${qrSvg(link)}</div><p class="muted" style="margin-top:10px">Share this link or QR. Any booking made through it earns you ${(a.commission_rate*100)}% commission.</p>`);},
+  'affiliate:bookings':async(m)=>{const b=await api('/api/bookings');m.innerHTML=`<h3 style="margin:0 0 12px">Bookings</h3>`+bookingsTable(b);},
+  'affiliate:wallet':async(m)=>{await walletView(m);},
+};
+async function walletView(m){const w=await api('/api/wallets/me');m.innerHTML=card(`<h3 style="margin:0 0 4px">Wallet</h3><div class="n" style="font-size:26px;font-weight:800;color:var(--blue)">${money(w.balance)}</div><div class="muted">Available balance</div><div class="row" style="margin-top:14px"><input id="po-amt" type="number" placeholder="Amount to withdraw"><button class="btn" onclick="requestPayout()">Request payout</button></div>`)+`<h3 style="margin:20px 0 8px">Transactions</h3>`+tbl(['Date','Type','Amount','Ref'],w.transactions.map(t=>[String(t.created_at||'').slice(0,10),t.type,money(t.amount),t.ref||'']));}
+function tbl(head,rows){return `<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${head.length}" class="muted">No data</td></tr>`}</tbody></table>`;}
+function statusTag(s){return `<span class="tag ${s}">${s}</span>`;}
+function bookingsTable(b,actions){return tbl(['Ref','Trip','Date','Pax','Amount','Status'].concat(actions?['Action']:[]),b.map(x=>[`<code>${x.ref}</code>`,esc(x.service_title||''),x.date||'—',x.pax,money(x.amount),statusTag(x.status)].concat(actions?[`<button class="btn sm" onclick="setBooking(${x.id},'confirmed')">Confirm</button> <button class="btn sm ghost" onclick="setBooking(${x.id},'completed')">Complete</button>`]:[])));}
+function payoutActions(x){if(x.status==='requested')return `<button class="btn sm" onclick="setPayout(${x.id},'approved')">Approve</button> <button class="btn sm danger" onclick="setPayout(${x.id},'rejected')">Reject</button>`;if(x.status==='approved')return `<button class="btn sm" onclick="setPayout(${x.id},'paid')">Mark paid</button>`;return '—';}
+let CATCACHE=null;async function ensureCats(){if(!CATCACHE)CATCACHE=await api('/api/categories');return CATCACHE;}
+function catName(id){const c=(CATCACHE||[]).find(x=>x.id===id);return c?esc((c.labels&&c.labels.en)||c.key):'—';}
+
+async function setVendor(id,st){try{await api('/api/vendors/'+id+'/status',{method:'PUT',body:{status:st}});toast('Updated');loadSec();}catch(e){toast(e.message);}}
+async function setBooking(id,st){try{await api('/api/bookings/'+id+'/status',{method:'PUT',body:{status:st}});toast('Booking '+st);loadSec();}catch(e){toast(e.message);}}
+async function setPayout(id,st){try{await api('/api/payouts/'+id,{method:'PUT',body:{status:st}});toast('Payout '+st);loadSec();}catch(e){toast(e.message);}}
+async function delService(id){if(!confirm('Delete this service?'))return;try{await api('/api/services/'+id,{method:'DELETE'});toast('Deleted');loadSec();}catch(e){toast(e.message);}}
+async function delAff(id){if(!confirm('Remove marketer?'))return;try{await api('/api/affiliates/'+id,{method:'DELETE'});toast('Removed');loadSec();}catch(e){toast(e.message);}}
+async function delBanner(id){if(!confirm('Delete banner?'))return;try{await api('/api/banners/'+id,{method:'DELETE'});toast('Deleted');loadSec();}catch(e){toast(e.message);}}
+async function delReview(id){if(!confirm('Delete this review?'))return;try{await api('/api/admin/reviews/'+id,{method:'DELETE'});toast('Deleted');loadSec();}catch(e){toast(e.message);}}
+async function saveSettings(keys){const body={};keys.forEach(k=>{body[k]=document.getElementById('set-'+k).value;});try{await api('/api/admin/settings',{method:'PUT',body});toast('Settings saved');loadSec();}catch(e){toast(e.message);}}
+async function saveProfile(){try{await api('/api/vendors/me',{method:'PUT',body:{name:v('vp-name'),city:v('vp-city'),languages:v('vp-langs'),description:v('vp-desc')}});toast('Profile saved');}catch(e){toast(e.message);}}
+async function requestPayout(){try{await api('/api/payouts',{method:'POST',body:{amount:Number(v('po-amt'))}});toast('Payout requested');loadSec();}catch(e){toast(e.message);}}
+
+async function openService(id){await ensureCats();SF_IMGS=[];document.getElementById('sf-cat').innerHTML=CATCACHE.map(c=>`<option value="${c.key}">${esc((c.labels&&c.labels.en)||c.key)}</option>`).join('');
+  if(id){const s=await api('/api/services/'+id);document.getElementById('svc-title').textContent='Edit service';document.getElementById('sf-id').value=s.id;document.getElementById('sf-title').value=s.title;document.getElementById('sf-loc').value=s.location||'';document.getElementById('sf-price').value=s.price;document.getElementById('sf-dur').value=s.duration||'';document.getElementById('sf-desc').value=s.description||'';document.getElementById('sf-feat').checked=!!s.featured;SF_IMGS=(s.images||[]).slice();const c=CATCACHE.find(x=>x.id===s.category_id);if(c)document.getElementById('sf-cat').value=c.key;}
+  else{document.getElementById('svc-title').textContent='New service';['sf-id','sf-title','sf-loc','sf-price','sf-dur','sf-desc'].forEach(x=>document.getElementById(x).value='');document.getElementById('sf-feat').checked=false;}
+  renderSfImgs();openModal('svc-modal');}
+function renderSfImgs(){document.getElementById('sf-imgs').innerHTML=SF_IMGS.map((u,i)=>`<div class="th" style="background-image:url('${u}')"><b onclick="SF_IMGS.splice(${i},1);renderSfImgs()">×</b></div>`).join('');}
+function sfUpload(e){[...e.target.files].forEach(f=>{const r=new FileReader();r.onload=()=>{SF_IMGS.push(r.result);renderSfImgs();};r.readAsDataURL(f);});e.target.value='';}
+async function saveService(){const id=document.getElementById('sf-id').value;const body={title:v('sf-title'),category_key:v('sf-cat'),location:v('sf-loc'),price:Number(v('sf-price'))||0,duration:v('sf-dur'),description:v('sf-desc'),featured:document.getElementById('sf-feat').checked,images:SF_IMGS};
+  try{if(id)await api('/api/services/'+id,{method:'PUT',body});else await api('/api/services',{method:'POST',body});closeModal('svc-modal');toast('Saved');loadSec();}catch(e){toast(e.message);}}
+
+async function saveMarketer(){try{await api('/api/affiliates',{method:'POST',body:{name:v('mk-name'),email:v('mk-email'),password:v('mk-pass')||undefined,commission_rate:(Number(v('mk-rate'))||5)/100,code:v('mk-code')||undefined}});closeModal('mkt-modal');['mk-name','mk-email','mk-pass','mk-code'].forEach(x=>document.getElementById(x).value='');toast('Marketer created');loadSec();}catch(e){toast(e.message);}}
+
+async function openBanner(id){const svc=await api('/api/services');document.getElementById('bn-svc').innerHTML=`<option value="">— none —</option>`+svc.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  if(id){const b=(await api('/api/banners?all=1')).find(x=>x.id===id);document.getElementById('ban-title').textContent='Edit banner';document.getElementById('bn-id').value=b.id;document.getElementById('bn-title').value=b.title||'';document.getElementById('bn-image').value=b.image||'';document.getElementById('bn-svc').value=b.service_id||'';document.getElementById('bn-active').checked=!!b.active;}
+  else{document.getElementById('ban-title').textContent='New banner';['bn-id','bn-title','bn-image'].forEach(x=>document.getElementById(x).value='');document.getElementById('bn-active').checked=true;}
+  openModal('ban-modal');}
+async function saveBanner(){const id=document.getElementById('bn-id').value;const body={title:v('bn-title'),image:v('bn-image'),service_id:v('bn-svc')||null,active:document.getElementById('bn-active').checked};try{if(id)await api('/api/banners/'+id,{method:'PUT',body});else await api('/api/banners',{method:'POST',body});closeModal('ban-modal');toast('Saved');loadSec();}catch(e){toast(e.message);}}
+
+function copyLink(){const el=document.getElementById('aff-link');el.select();navigator.clipboard.writeText(el.value).then(()=>toast('Copied'));}
+function qrSvg(text){let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCodeAt(i))>>>0;const n=21,cell=8;let rects='';for(let y=0;y<n;y++)for(let x=0;x<n;x++){const fin=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);const on=fin?((x===0||x===6||y===0||y===6||(x>=2&&x<=4&&y>=2&&y<=4))):(((h>>((x*3+y*5)%31))&1)&&((x+y)%2===0||((h>>(x%13))&1)));if(on)rects+=`<rect x="${x*cell}" y="${y*cell}" width="${cell}" height="${cell}"/>`;}return `<svg class="qr" width="${n*cell}" height="${n*cell}" viewBox="0 0 ${n*cell} ${n*cell}" fill="#111">${rects}</svg>`;}
+
+renderAuth();loadSlider();loadCats();loadServices();
+</script>
+</body>
+</html>
