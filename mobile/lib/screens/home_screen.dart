@@ -93,6 +93,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             SliverToBoxAdapter(child: _CategoryBar(onOpen: () {})),
+            if (s.banners.length > 1) ...[
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text('Special offers',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: BannerSlider(
+                    banners: s.banners.reversed.toList(),
+                    height: 130,
+                    intervalSeconds: 6,
+                    onTap: (b) {
+                      if (b.serviceId != null) _openService(b.serviceId!);
+                    },
+                  ),
+                ),
+              ),
+            ],
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
@@ -148,8 +170,8 @@ class _CategoryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
-    final List<String> keys = <String>['all'];
-    final List<String> names = <String>['All'];
+    final List<String> keys = ['all'];
+    final List<String> names = ['All'];
     for (final Category c in s.categories) {
       keys.add(c.key);
       names.add(c.name);
@@ -205,7 +227,7 @@ class _SortButton extends StatelessWidget {
     return PopupMenuButton<Sort>(
       initialValue: s.sort,
       onSelected: (v) => context.read<AppState>().setSort(v),
-      itemBuilder: (c) => Sort.values.map((e) => PopupMenuItem(value: e, child: Text(e.label))).toList(),
+      itemBuilder: (c) => Sort.values.map((e) => PopupMenuItem<Sort>(value: e, child: Text(e.label))).toList(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
