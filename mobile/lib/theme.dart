@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 
-/// Brand palette — matches the web app exactly.
+/// Brand palette — RaGo identity (matches the web app).
 class AppColors {
-  static const blue = Color(0xFF159A8F); // primary teal
-  static const blueSoft = Color(0xFFE2F3F0);
-  static const blueHover = Color(0xFF0F847A);
+  static const blue = Color(0xFF123B4C);     // RaGo navy (primary)
+  static const blueSoft = Color(0xFFE4ECEE); // light navy tint
+  static const blueHover = Color(0xFF0E2E3B);
   static const green = Color(0xFF46A171);
-  static const gold = Color(0xFFC79A3B);
-  static const orange = Color(0xFFD5803B);
+  static const gold = Color(0xFFE8B84B);
+  static const orange = Color(0xFFE8850F);    // RaGo orange (accent)
+  static const cream = Color(0xFFFFF7E8);      // RaGo cream
   static const red = Color(0xFFE56458);
-  static const text = Color(0xFF2C2C2B);
-  static const text2 = Color(0xFF7D7A75);
+  static const text = Color(0xFF16333F);
+  static const text2 = Color(0xFF6B7B85);
   static const border = Color(0xFFE6E5E3);
-  static const soft = Color(0xFFF9F8F7);
+  static const soft = Color(0xFFF7F4EE);
 }
 
 const double kRadius = 12;
@@ -23,7 +24,7 @@ ThemeData buildTheme() {
     scaffoldBackgroundColor: Colors.white,
     colorScheme: base.colorScheme.copyWith(
       primary: AppColors.blue,
-      secondary: AppColors.green,
+      secondary: AppColors.orange,
       surface: Colors.white,
     ),
     appBarTheme: const AppBarTheme(
