@@ -48,7 +48,8 @@
     sec.className = "container"
     sec.style.margin = "14px auto 0"
     sec.innerHTML =
-      '<div style="background:linear-gradient(135deg,#123B4C,#0E2E3B);border-radius:14px;padding:22px 24px;color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:16px">' +
+      '<div id="gt-banner-wrap" style="position:relative">' +
+      '<div id="gt-banner" style="background:linear-gradient(135deg,#123B4C,#0E2E3B);border-radius:14px;padding:22px 24px 26px;color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:16px">' +
       '<div style="flex:1;min-width:220px">' +
       '<div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#E8850F">Create Your Journey</div>' +
       '<h2 style="margin:6px 0 4px;font-size:22px;color:#fff">Design your own trip — other travellers can join</h2>' +
@@ -58,7 +59,11 @@
       '<button class="btn" style="background:#E8850F" onclick="GT.openRequest()">+ Create your journey</button>' +
       '<button class="btn ghost" onclick="GT.scrollToOpen()">Browse open trips</button>' +
       "</div></div>" +
-      '<div id="gt-open" style="margin-top:22px"></div>'
+      '<div id="gt-open-row" class="gt-open-row" style="display:none">' +
+      '<button class="gt-arrow" onclick="GT.scrollStrip(-1)" style="left:2px">\u2039</button>' +
+      '<div id="gt-open" class="gt-strip"></div>' +
+      '<button class="gt-arrow" onclick="GT.scrollStrip(1)" style="right:2px">\u203a</button>' +
+      "</div></div>"
     pv.insertBefore(sec, pv.firstChild)
     loadOpen()
   }
@@ -66,57 +71,57 @@
   async function loadOpen() {
     var box = document.getElementById("gt-open")
     if (!box) return
-    box.innerHTML = '<div class="muted">Loading group trips…</div>'
+    var row = document.getElementById("gt-open-row")
+    var banner = document.getElementById("gt-banner")
+    box.innerHTML = '<div class="muted" style="padding:10px">Loading…</div>'
+    function collapse() {
+      box.innerHTML = ""
+      if (row) row.style.display = "none"
+      if (banner) banner.style.paddingBottom = "26px"
+    }
     try {
       var r = await api("/api/group-trips")
       var trips = (r && r.trips) || []
       if (!trips.length) {
-        box.innerHTML = ""
+        collapse()
         return
       }
-      box.innerHTML =
-        '<h2 style="margin-bottom:2px">Open Group Trips</h2>' +
-        '<div class="muted" style="margin-bottom:14px">Join a trip created by another traveller</div>' +
-        '<div class="grid">' +
-        trips.map(tripCard).join("") +
-        "</div>"
+      if (row) row.style.display = "block"
+      if (banner) banner.style.paddingBottom = "78px"
+      box.innerHTML = trips.map(tripCard).join("")
     } catch (e) {
-      box.innerHTML = ""
+      collapse()
     }
   }
 
   function tripCard(t) {
     var pct = pctOf(t)
-    var pp =
-      t.current_per_person != null
-        ? money(t.current_per_person) + " / person"
-        : "Price pending"
+    var pp = t.current_per_person != null ? money(t.current_per_person) : "—"
     return (
-      '<div class="card" onclick="GT.openTrip(' +
+      '<div class="gt-card" onclick="GT.openTrip(' +
       t.id +
-      ')"><div class="body">' +
-      '<div class="t">' +
+      ')">' +
+      '<div style="font-weight:700;font-size:14px;color:#123B4C;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
       esc(t.title || "Custom trip") +
       "</div>" +
-      '<div class="loc">🗓 ' +
+      '<div class="muted" style="font-size:11px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗓 ' +
       fmtDate(t.preferred_date) +
       " · ⏳ " +
       esc(countdown(t.deadline)) +
       "</div>" +
-      '<div class="muted" style="font-size:13px;margin:8px 0;height:36px;overflow:hidden">' +
-      esc((t.itinerary_text || "").slice(0, 96)) +
-      "</div>" +
-      '<div style="background:var(--soft2);border-radius:999px;height:8px;overflow:hidden;margin:8px 0"><div style="height:100%;width:' +
+      '<div style="background:var(--soft2);border-radius:999px;height:6px;overflow:hidden;margin:6px 0"><div style="height:100%;width:' +
       pct +
       '%;background:var(--green)"></div></div>' +
-      '<div class="meta"><span class="price">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="font-weight:700;color:#E8850F;font-size:13px">' +
       pp +
-      '</span><span class="muted" style="font-size:13px">' +
+      '<span style="font-weight:400;color:#888;font-size:11px"> /person</span></span>' +
+      '<span class="muted" style="font-size:11px">' +
       t.members_count +
       "/" +
       (t.min_people || "?") +
       " joined</span></div>" +
-      "</div></div>"
+      "</div>"
     )
   }
 
@@ -130,21 +135,28 @@
     v0("gtq-title", "")
     v0("gtq-plan", "")
     v0("gtq-date", "")
+    SEL_PLACES = {}
     openModal("gt-req-modal")
+    loadPlaces()
   }
 
   async function submitRequest() {
+    var picked = Object.keys(SEL_PLACES)
     var plan = (document.getElementById("gtq-plan").value || "").trim()
-    if (!plan) {
-      toast("Please describe your trip plan")
+    if (!picked.length && !plan) {
+      toast("Pick at least one place or describe your trip")
       return
     }
+    var full =
+      (picked.length ? "Places: " + picked.join(", ") : "") +
+      (picked.length && plan ? "\n\n" : "") +
+      plan
     try {
       await api("/api/group-trips/request", {
         method: "POST",
         body: {
           title: v("gtq-title"),
-          itinerary_text: plan,
+          itinerary_text: full,
           preferred_date: v("gtq-date") || null,
         },
       })
@@ -152,6 +164,61 @@
       toast("Request sent! We\u2019ll price it and get back to you.")
     } catch (e) {
       toast(e.message)
+    }
+  }
+
+  var SEL_PLACES = {}
+  var PLACES = null
+  async function loadPlaces() {
+    var box = document.getElementById("gtq-places")
+    if (!box) return
+    box.innerHTML = '<span class="muted" style="font-size:12px">Loading places…</span>'
+    var landmarks = ["Giza Pyramids", "The Egyptian Museum", "Khan el-Khalili", "Cairo", "Luxor", "Karnak Temple", "Valley of the Kings", "Aswan", "Abu Simbel", "Philae Temple", "Hurghada", "Sharm El-Sheikh", "Dahab", "Marsa Alam", "Alexandria", "Siwa Oasis", "White Desert", "Wadi El-Rayan", "Saint Catherine Monastery", "Nile Cruise"]
+    var extra = []
+    try {
+      var r = await api("/api/services")
+      var svs = Array.isArray(r) ? r : (r && r.services) || []
+      svs.forEach(function (s) {
+        if (s.location) extra.push(String(s.location).trim())
+        if (s.title) extra.push(String(s.title).trim())
+      })
+    } catch (e) {}
+    var seen = {},
+      list = []
+    landmarks.concat(extra).forEach(function (n) {
+      var k = (n || "").toLowerCase()
+      if (n && !seen[k]) {
+        seen[k] = 1
+        list.push(n)
+      }
+    })
+    PLACES = list
+    renderPlaces()
+  }
+  function renderPlaces() {
+    var box = document.getElementById("gtq-places")
+    if (!box || !PLACES) return
+    box.innerHTML = PLACES.map(function (n) {
+      var on = SEL_PLACES[n] ? " gt-on" : ""
+      return (
+        '<span class="gt-place' +
+        on +
+        '" data-n="' +
+        esc(n) +
+        '" onclick="GT.togglePlace(this)">' +
+        esc(n) +
+        "</span>"
+      )
+    }).join("")
+  }
+  function togglePlace(el) {
+    var name = el.getAttribute("data-n")
+    if (SEL_PLACES[name]) {
+      delete SEL_PLACES[name]
+      el.className = "gt-place"
+    } else {
+      SEL_PLACES[name] = 1
+      el.className = "gt-place gt-on"
     }
   }
 
@@ -308,8 +375,12 @@
     })
   }
   function scrollToOpen() {
-    var el = document.getElementById("gt-open")
+    var el = document.getElementById("gt-open-row")
     if (el) el.scrollIntoView({ behavior: "smooth" })
+  }
+  function scrollStrip(dir) {
+    var s = document.getElementById("gt-open")
+    if (s) s.scrollBy({ left: dir * 250, behavior: "smooth" })
   }
 
   function v0(id, val) {
@@ -325,7 +396,8 @@
       "<h3>Create your journey</h3>" +
       '<div class="field"><label>Trip title</label><input id="gtq-title" placeholder="e.g. Luxor &amp; Aswan — 3 days"></div>' +
       '<div class="field"><label>Preferred date</label><input id="gtq-date" type="date"></div>' +
-      '<div class="field"><label>Your plan &amp; places to visit</label><textarea id="gtq-plan" rows="6" placeholder="List the places you want to visit and the kind of trip you want…"></textarea></div>' +
+      '<div class="field"><label>Pick places to visit</label><div id="gtq-places" class="gt-places"></div></div>' +
+      '<div class="field"><label>Or add your own places / notes</label><textarea id="gtq-plan" rows="5" placeholder="Add any place not listed above, or describe the kind of trip you want…"></textarea></div>' +
       '<div class="muted" style="font-size:13px;margin-bottom:12px">We\u2019ll review your plan, set the price (private car / bus), then publish it so other travellers can join your group.</div>' +
       '<div class="row"><button class="btn" onclick="GT.submitRequest()">Send request</button><button class="btn ghost" onclick="closeModal(\'gt-req-modal\')">Cancel</button></div>' +
       "</div></div>" +
@@ -598,7 +670,26 @@
     } catch (e) {}
   }
 
+  function injectStyle() {
+    if (document.getElementById("gt-style")) return
+    var st = document.createElement("style")
+    st.id = "gt-style"
+    st.textContent =
+      ".gt-open-row{position:relative;margin-top:-58px;padding:0 34px;z-index:2}" +
+      ".gt-strip{display:flex;gap:12px;overflow-x:auto;scroll-behavior:smooth;padding:6px 4px 12px;scroll-snap-type:x mandatory}" +
+      ".gt-strip::-webkit-scrollbar{height:6px}" +
+      ".gt-strip::-webkit-scrollbar-thumb{background:rgba(0,0,0,.2);border-radius:3px}" +
+      ".gt-card{flex:0 0 220px;scroll-snap-align:start;background:#fff;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.16);padding:12px 14px;cursor:pointer;border:1px solid rgba(0,0,0,.06)}" +
+      ".gt-card:hover{transform:translateY(-2px);transition:.15s}" +
+      ".gt-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:32px;height:32px;border-radius:50%;border:none;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.2);cursor:pointer;font-size:18px;line-height:1;color:#123B4C}" +
+      ".gt-places{display:flex;flex-wrap:wrap;gap:8px;max-height:170px;overflow-y:auto;padding:4px 2px}" +
+      ".gt-place{border:1px solid var(--soft2,#e5e7eb);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;user-select:none;transition:.15s}" +
+      ".gt-place.gt-on{background:#123B4C;color:#fff;border-color:#123B4C}"
+    document.head.appendChild(st)
+  }
+
   function init() {
+    injectStyle()
     registerDashboard()
     injectEntry()
     checkDeepLink()
@@ -617,6 +708,8 @@
     accept: accept,
     copyShare: copyShare,
     scrollToOpen: scrollToOpen,
+    scrollStrip: scrollStrip,
+    togglePlace: togglePlace,
     loadOpen: loadOpen,
     openQuote: openQuote,
     submitQuote: submitQuote,
