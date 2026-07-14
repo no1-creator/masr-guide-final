@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'state.dart';
 import 'theme.dart';
+import 'splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/wishlist_screen.dart';
 import 'screens/offers_screen.dart';
@@ -12,20 +13,20 @@ void main() {
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppState()..boot(),
-      child: const MasrGuideApp(),
+      child: const RaGoApp(),
     ),
   );
 }
 
-class MasrGuideApp extends StatelessWidget {
-  const MasrGuideApp({super.key});
+class RaGoApp extends StatelessWidget {
+  const RaGoApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Masr Guide',
+      title: 'RaGo',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: const RootNav(),
+      home: const SplashScreen(next: RootNav()),
     );
   }
 }
