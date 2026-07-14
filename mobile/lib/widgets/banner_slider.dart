@@ -7,7 +7,15 @@ import 'common.dart';
 class BannerSlider extends StatefulWidget {
   final List<m.Banner> banners;
   final void Function(m.Banner) onTap;
-  const BannerSlider({super.key, required this.banners, required this.onTap});
+  final double height;
+  final int intervalSeconds;
+  const BannerSlider({
+    super.key,
+    required this.banners,
+    required this.onTap,
+    this.height = 170,
+    this.intervalSeconds = 4,
+  });
   @override
   State<BannerSlider> createState() => _BannerSliderState();
 }
@@ -21,7 +29,7 @@ class _BannerSliderState extends State<BannerSlider> {
   void initState() {
     super.initState();
     if (widget.banners.length > 1) {
-      _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _timer = Timer.periodic(Duration(seconds: widget.intervalSeconds), (_) {
         if (!mounted || !_controller.hasClients) return;
         _page = (_page + 1) % widget.banners.length;
         _controller.animateToPage(_page, duration: const Duration(milliseconds: 450), curve: Curves.easeInOut);
@@ -42,7 +50,7 @@ class _BannerSliderState extends State<BannerSlider> {
     return Column(
       children: [
         SizedBox(
-          height: 170,
+          height: widget.height,
           child: PageView.builder(
             controller: _controller,
             onPageChanged: (i) => setState(() => _page = i),
