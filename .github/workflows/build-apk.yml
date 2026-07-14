@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build APK
 
 on:
   push:
@@ -8,26 +8,40 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - name: Flutter version
-        run: flutter --version
-      - name: Create platform folders
-        run: flutter create .
-      - name: Allow cleartext traffic
-        run: sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+
       - name: Get dependencies
+        working-directory: mobile
         run: flutter pub get
+
+      - name: Generate android project
+        working-directory: mobile
+        run: flutter create --platforms=android --org com.rago .
+
+      - name: Generate launcher icons
+        working-directory: mobile
+        run: dart run flutter_launcher_icons
+
+      - name: Set app name to RaGo
+        working-directory: mobile
+        run: sed -i 's/android:label="[^"]*"/android:label="RaGo"/' android/app/src/main/AndroidManifest.xml
+
       - name: Build release APK
-        run: flutter build apk --release --no-tree-shake-icons
-      - name: Upload APK artifact
+        working-directory: mobile
+        run: flutter build apk --release
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: masr-guide-apk
+          name: RaGo-apk
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
