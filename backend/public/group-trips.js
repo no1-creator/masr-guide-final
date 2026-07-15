@@ -34,6 +34,145 @@
       : 0
   }
 
+  // ---- date + voting + whatsapp helpers ----
+  var JDAYS = {}
+  var MEM_LIST = []
+  var MEM_TRIPOBJ = null
+  function daysBetween(from, to) {
+    var out = []
+    if (!from || !to) return out
+    var d = new Date(from + "T00:00:00")
+    var end = new Date(to + "T00:00:00")
+    if (isNaN(d.getTime()) || isNaN(end.getTime())) return out
+    var g = 0
+    while (d <= end && g < 400) {
+      out.push(d.toISOString().slice(0, 10))
+      d = new Date(d.getTime() + 86400000)
+      g++
+    }
+    return out
+  }
+  function fmtDay(s) {
+    if (!s) return "—"
+    try {
+      return new Date(s + "T00:00:00").toLocaleDateString(undefined, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      })
+    } catch (e) {
+      return s
+    }
+  }
+  function toggleDay(el) {
+    var d = el.getAttribute("data-d")
+    if (JDAYS[d]) {
+      delete JDAYS[d]
+      el.className = "gt-day"
+    } else {
+      JDAYS[d] = 1
+      el.className = "gt-day gt-on"
+    }
+  }
+  function buildVoteBlock(t, cands, mine) {
+    var avail = (mine && mine.available_days) || []
+    var myVote = mine && mine.vote_date
+    var dl = t.vote_deadline ? countdown(t.vote_deadline) : ""
+    var rows = cands
+      .map(function (c) {
+        var canVote = avail.indexOf(c.date) >= 0
+        var isMine = myVote === c.date
+        return (
+          '<div class="gt-vote-row"><div><b>' +
+          fmtDay(c.date) +
+          '</b> <span class="muted" style="font-size:12px">· ' +
+          c.available_count +
+          " available · " +
+          c.votes +
+          " votes</span></div>" +
+          (mine
+            ? canVote
+              ? '<button class="btn sm' +
+                (isMine ? "" : " ghost") +
+                '" onclick="GT.vote(' +
+                t.id +
+                ",'" +
+                c.date +
+                "')\">" +
+                (isMine ? "✓ Your vote" : "Vote") +
+                "</button>"
+              : '<span class="muted" style="font-size:12px">not available</span>'
+            : "") +
+          "</div>"
+        )
+      })
+      .join("")
+    return (
+      '<div class="box" style="margin-top:12px"><b>🗳 Vote for the final date</b>' +
+      (dl
+        ? '<div class="muted" style="font-size:12px;margin:4px 0 8px">Voting closes in ' +
+          esc(dl) +
+          " · highest-voted day wins</div>"
+        : "") +
+      (mine
+        ? ""
+        : '<div class="muted" style="font-size:12px;margin:4px 0 8px">Join the trip to vote.</div>') +
+      (rows || '<div class="muted">No candidate days yet.</div>') +
+      "</div>"
+    )
+  }
+  async function vote(id, date) {
+    try {
+      await api("/api/group-trips/" + id + "/vote", {
+        method: "POST",
+        body: { date: date },
+      })
+      toast("Vote saved")
+      openTrip(id)
+    } catch (e) {
+      toast(e.message)
+    }
+  }
+  function waLink(phone, msg) {
+    var p = String(phone || "").replace(/[^0-9]/g, "")
+    return "https://wa.me/" + p + "?text=" + encodeURIComponent(msg)
+  }
+  function tripUrl(trip) {
+    return location.origin + location.pathname + "?trip=" + (trip && trip.id)
+  }
+  function waMsg(trip, m) {
+    var name = (m && m.name) || "traveller"
+    var title = (trip && trip.title) || "your RaGo trip"
+    if (trip && trip.status === "voting")
+      return (
+        "Hi " +
+        name +
+        '! Good news — the group for "' +
+        title +
+        '" is complete 🎉 Open RaGo to vote on the final date: ' +
+        tripUrl(trip)
+      )
+    if (trip && trip.final_date)
+      return (
+        "Hi " +
+        name +
+        '! The final date for "' +
+        title +
+        '" is ' +
+        fmtDay(trip.final_date) +
+        ". Please complete your payment on RaGo: " +
+        tripUrl(trip)
+      )
+    return (
+      "Hi " + name + '! Update about your RaGo trip "' + title + '": ' + tripUrl(trip)
+    )
+  }
+  function notifyAll() {
+    MEM_LIST.forEach(function (m) {
+      if (m.phone) window.open(waLink(m.phone, waMsg(MEM_TRIPOBJ, m)), "_blank")
+    })
+  }
+
   // ========================================================================
   // TRAVELLER-FACING UI
   // ========================================================================
@@ -87,40 +226,52 @@
         return
       }
       if (row) row.style.display = "block"
-      if (banner) banner.style.paddingBottom = "78px"
+      if (banner) banner.style.paddingBottom = "70px"
       box.innerHTML = trips.map(tripCard).join("")
     } catch (e) {
       collapse()
     }
   }
 
+  function mainPlace(t) {
+    var txt = t.itinerary_text || ""
+    var m = /Places:\s*([^\n,]+)/i.exec(txt)
+    if (m) return m[1].trim()
+    if (txt.trim()) return txt.trim().split(/[\n,]/)[0].slice(0, 40)
+    return t.title || "Custom trip"
+  }
+
   function tripCard(t) {
     var pct = pctOf(t)
-    var pp = t.current_per_person != null ? money(t.current_per_person) : "—"
+    var joined = t.members_count || 0
+    var min = t.min_people || 0
+    var left = Math.max(0, min - joined)
+    var pp = t.current_per_person != null ? money(t.current_per_person) : null
     return (
-      '<div class="gt-card" onclick="GT.openTrip(' +
+      '<div class="gt-cardwrap">' +
+      '<div class="gt-tile" onclick="GT.openTrip(' +
       t.id +
       ')">' +
-      '<div style="font-weight:700;font-size:14px;color:#123B4C;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
-      esc(t.title || "Custom trip") +
+      '<div class="gt-tile-top">' +
+      (pp ? '<span class="gt-price">' + pp + "</span>" : "") +
       "</div>" +
-      '<div class="muted" style="font-size:11px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗓 ' +
-      fmtDate(t.preferred_date) +
-      " · ⏳ " +
-      esc(countdown(t.deadline)) +
-      "</div>" +
-      '<div style="background:var(--soft2);border-radius:999px;height:6px;overflow:hidden;margin:6px 0"><div style="height:100%;width:' +
-      pct +
-      '%;background:var(--green)"></div></div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-      '<span style="font-weight:700;color:#E8850F;font-size:13px">' +
-      pp +
-      '<span style="font-weight:400;color:#888;font-size:11px"> /person</span></span>' +
-      '<span class="muted" style="font-size:11px">' +
-      t.members_count +
+      '<div class="gt-tile-mid"><span class="gt-count">' +
+      joined +
       "/" +
-      (t.min_people || "?") +
-      " joined</span></div>" +
+      (min || "?") +
+      '</span><span class="gt-countlbl">joined</span></div>' +
+      '<div class="gt-tile-bar"><div style="width:' +
+      pct +
+      '%"></div></div>' +
+      '<div class="gt-tile-left">' +
+      (left > 0 ? left + " spots left" : "Confirmed \u2713") +
+      "</div>" +
+      "</div>" +
+      '<div class="gt-place-lbl" title="' +
+      esc(mainPlace(t)) +
+      '">\ud83d\udccd ' +
+      esc(mainPlace(t)) +
+      "</div>" +
       "</div>"
     )
   }
@@ -134,7 +285,8 @@
     ensureModals()
     v0("gtq-title", "")
     v0("gtq-plan", "")
-    v0("gtq-date", "")
+    v0("gtq-from", "")
+    v0("gtq-to", "")
     SEL_PLACES = {}
     openModal("gt-req-modal")
     loadPlaces()
@@ -151,13 +303,20 @@
       (picked.length ? "Places: " + picked.join(", ") : "") +
       (picked.length && plan ? "\n\n" : "") +
       plan
+    var df = v("gtq-from"),
+      dt = v("gtq-to")
+    if (df && dt && df > dt) {
+      toast("End date must be after start date")
+      return
+    }
     try {
       await api("/api/group-trips/request", {
         method: "POST",
         body: {
           title: v("gtq-title"),
           itinerary_text: full,
-          preferred_date: v("gtq-date") || null,
+          date_from: df || null,
+          date_to: dt || null,
         },
       })
       closeModal("gt-req-modal")
@@ -260,6 +419,21 @@
             t.id +
             ')">Accept quote &amp; open trip</button>'
           : ""
+      var cands = r.candidate_days || []
+      var voteBlock = ""
+      if (t.status === "voting") {
+        var mine = null
+        try {
+          var me = await api("/api/group-trips/" + id + "/me")
+          mine = me.member
+        } catch (e) {}
+        voteBlock = buildVoteBlock(t, cands, mine)
+      }
+      var finalBlock = t.final_date
+        ? '<div class="box" style="margin-top:12px;border:1px solid var(--green)"><b>✅ Final date:</b> ' +
+          fmtDay(t.final_date) +
+          "</div>"
+        : ""
       var body = document.getElementById("detail-body")
       body.innerHTML =
         '<div class="two"><div>' +
@@ -308,6 +482,8 @@
         "</div>" +
         joinBtn +
         acceptBtn +
+        voteBlock +
+        finalBlock +
         '<div style="margin-top:16px"><b style="font-size:13px">Share &amp; invite</b>' +
         '<div class="linkbox"><input id="gt-share" value="' +
         esc(shareUrl) +
@@ -323,7 +499,7 @@
     }
   }
 
-  function openJoin(id) {
+  async function openJoin(id) {
     if (!loggedIn()) {
       toast("Please log in to join")
       if (window.openLogin) openLogin()
@@ -333,17 +509,52 @@
     document.getElementById("gtj-id").value = id
     document.getElementById("gtj-seats").value = 1
     document.getElementById("gtj-name").value = (USER && USER.name) || ""
+    document.getElementById("gtj-phone").value = (USER && USER.phone) || ""
+    JDAYS = {}
+    var box = document.getElementById("gtj-days")
+    box.innerHTML =
+      '<span class="muted" style="font-size:12px">Loading dates…</span>'
+    try {
+      var r = await api("/api/group-trips/" + id)
+      var t = (r && r.trip) || {}
+      var days = daysBetween(t.date_from, t.date_to)
+      box.innerHTML = days.length
+        ? days
+            .map(function (d) {
+              return (
+                '<span class="gt-day" data-d="' +
+                d +
+                '" onclick="GT.toggleDay(this)">' +
+                fmtDay(d) +
+                "</span>"
+              )
+            })
+            .join("")
+        : '<span class="muted" style="font-size:12px">No specific dates set — you can just join.</span>'
+    } catch (e) {
+      box.innerHTML =
+        '<span class="muted" style="font-size:12px">Could not load dates.</span>'
+    }
     openModal("gt-join-modal")
   }
 
   async function submitJoin() {
     var id = v("gtj-id")
+    var days = Object.keys(JDAYS)
+    var hasDayOptions =
+      document.querySelectorAll("#gtj-days .gt-day").length > 0
+    if (hasDayOptions && !days.length) {
+      toast("Pick the days that work for you")
+      return
+    }
     try {
       await api("/api/group-trips/" + id + "/join", {
         method: "POST",
         body: {
           seats: Number(v("gtj-seats")) || 1,
           name: v("gtj-name") || null,
+          phone: v("gtj-phone") || null,
+          available_days: days,
           referral_code: localStorage.getItem("mg_ref") || null,
         },
       })
@@ -358,7 +569,10 @@
 
   async function accept(id) {
     try {
-      await api("/api/group-trips/" + id + "/accept", { method: "POST" })
+      await api("/api/group-trips/" + id + "/accept", {
+        method: "POST",
+        body: { phone: (USER && USER.phone) || null },
+      })
       toast("Your trip is now open for others to join!")
       openTrip(id)
       loadOpen()
@@ -395,7 +609,7 @@
       '<div class="overlay" id="gt-req-modal"><div class="modal">' +
       "<h3>Create your journey</h3>" +
       '<div class="field"><label>Trip title</label><input id="gtq-title" placeholder="e.g. Luxor &amp; Aswan — 3 days"></div>' +
-      '<div class="field"><label>Preferred date</label><input id="gtq-date" type="date"></div>' +
+      '<div class="row"><div class="field"><label>Available from</label><input id="gtq-from" type="date"></div><div class="field"><label>Available to</label><input id="gtq-to" type="date"></div></div>' +
       '<div class="field"><label>Pick places to visit</label><div id="gtq-places" class="gt-places"></div></div>' +
       '<div class="field"><label>Or add your own places / notes</label><textarea id="gtq-plan" rows="5" placeholder="Add any place not listed above, or describe the kind of trip you want…"></textarea></div>' +
       '<div class="muted" style="font-size:13px;margin-bottom:12px">We\u2019ll review your plan, set the price (private car / bus), then publish it so other travellers can join your group.</div>' +
@@ -404,8 +618,10 @@
       '<div class="overlay" id="gt-join-modal"><div class="modal">' +
       "<h3>Join this trip</h3><input type=\"hidden\" id=\"gtj-id\">" +
       '<div class="field"><label>Your name</label><input id="gtj-name"></div>' +
+      '<div class="field"><label>WhatsApp number</label><input id="gtj-phone" placeholder="+20 1x xxxx xxxx"></div>' +
       '<div class="field"><label>Seats</label><input id="gtj-seats" type="number" min="1" value="1"></div>' +
-      '<div class="muted" style="font-size:13px;margin-bottom:12px">You\u2019ll reserve your seat now. Payment is arranged once the group is confirmed.</div>' +
+      '<div class="field"><label>Which days work for you?</label><div id="gtj-days" class="gt-places"></div></div>' +
+      '<div class="muted" style="font-size:13px;margin-bottom:12px">Pick the days you\u2019re available from the range. When the group fills up we\u2019ll vote on the final date, then arrange payment. We\u2019ll notify you on WhatsApp.</div>' +
       '<div class="row"><button class="btn" onclick="GT.submitJoin()">Confirm &amp; join</button><button class="btn ghost" onclick="closeModal(\'gt-join-modal\')">Cancel</button></div>' +
       "</div></div>"
     document.body.appendChild(wrap)
@@ -472,6 +688,9 @@
         '"></div>' +
         '<div class="field"><label>Refund window (hours before trip)</label><input id="gts-refund" type="number" value="' +
         s.refund_hours +
+        '"></div>' +
+        '<div class="field"><label>Voting window (hours)</label><input id="gts-vote" type="number" value="' +
+        (s.vote_hours != null ? s.vote_hours : 48) +
         '"></div>' +
         '<div class="field"><label>Feature</label><select id="gts-en"><option value="1"' +
         (s.enabled ? " selected" : "") +
@@ -571,29 +790,78 @@
     try {
       var r = await api("/api/admin/group-trips/" + id + "/members")
       var ms = (r && r.members) || []
-      document.getElementById("gt-mem-body").innerHTML = ms.length
-        ? tbl(
-            ["Name", "Seats", "Amount", "Status", "Action"],
-            ms.map(function (mm) {
-              return [
-                esc(mm.name || "—"),
-                mm.seats,
-                money(mm.amount),
-                statusTag(mm.status),
-                (mm.status !== "paid"
-                  ? '<button class="btn sm" onclick="GT.pay(' +
-                    mm.id +
-                    ",'paid')\">Mark paid</button> "
-                  : "") +
-                  (mm.status !== "refunded"
-                    ? '<button class="btn sm ghost" onclick="GT.pay(' +
-                      mm.id +
-                      ",'refunded')\">Refund</button>"
-                    : ""),
-              ]
-            }),
-          )
-        : '<div class="muted">No travellers have joined yet.</div>'
+      var tr = await api("/api/group-trips/" + id).catch(function () {
+        return null
+      })
+      var trip = tr && tr.trip
+      var cands = (tr && tr.candidate_days) || []
+      MEM_LIST = ms
+      MEM_TRIPOBJ = trip
+      var head = trip
+        ? '<div class="muted" style="font-size:13px;margin-bottom:8px">Status: ' +
+          esc(trip.status) +
+          (trip.final_date ? " · Final date: " + fmtDay(trip.final_date) : "") +
+          (trip.vote_deadline && trip.status === "voting"
+            ? " · Voting closes in " + esc(countdown(trip.vote_deadline))
+            : "") +
+          "</div>"
+        : ""
+      var candBlock = cands.length
+        ? '<div class="box" style="margin-bottom:10px"><b>Day votes</b>' +
+          cands
+            .map(function (c) {
+              return (
+                '<div class="gt-vote-row"><span>' +
+                fmtDay(c.date) +
+                '</span><span class="muted" style="font-size:12px">' +
+                c.available_count +
+                " available · " +
+                c.votes +
+                " votes</span></div>"
+              )
+            })
+            .join("") +
+          "</div>"
+        : ""
+      var notifyBtn = ms.some(function (m) {
+        return m.phone
+      })
+        ? '<button class="btn sm" style="margin-bottom:10px" onclick="GT.notifyAll()">📲 Notify all on WhatsApp</button>'
+        : ""
+      document.getElementById("gt-mem-body").innerHTML =
+        head +
+        candBlock +
+        notifyBtn +
+        (ms.length
+          ? tbl(
+              ["Name", "Phone", "Seats", "Amount", "Status", "Action"],
+              ms.map(function (mm) {
+                var wa = mm.phone
+                  ? '<a class="btn sm ghost" target="_blank" href="' +
+                    waLink(mm.phone, waMsg(trip, mm)) +
+                    '">WhatsApp</a> '
+                  : ""
+                return [
+                  esc(mm.name || "—"),
+                  mm.phone ? esc(mm.phone) : "—",
+                  mm.seats,
+                  money(mm.amount),
+                  statusTag(mm.status),
+                  wa +
+                    (mm.status !== "paid"
+                      ? '<button class="btn sm" onclick="GT.pay(' +
+                        mm.id +
+                        ",'paid')\">Mark paid</button> "
+                      : "") +
+                    (mm.status !== "refunded"
+                      ? '<button class="btn sm ghost" onclick="GT.pay(' +
+                        mm.id +
+                        ",'refunded')\">Refund</button>"
+                      : ""),
+                ]
+              }),
+            )
+          : '<div class="muted">No travellers have joined yet.</div>')
       openModal("gt-mem-modal")
     } catch (e) {
       toast(e.message)
@@ -620,6 +888,7 @@
       small_size: Number(v("gts-small")),
       deadline_days: Number(v("gts-dl")),
       refund_hours: Number(v("gts-refund")),
+      vote_hours: Number(v("gts-vote")),
       enabled: v("gts-en") === "1",
     }
     try {
@@ -675,16 +944,29 @@
     var st = document.createElement("style")
     st.id = "gt-style"
     st.textContent =
-      ".gt-open-row{position:relative;margin-top:-58px;padding:0 34px;z-index:2}" +
-      ".gt-strip{display:flex;gap:12px;overflow-x:auto;scroll-behavior:smooth;padding:6px 4px 12px;scroll-snap-type:x mandatory}" +
+      ".gt-open-row{position:relative;margin-top:-60px;padding:0 34px;z-index:2}" +
+      ".gt-strip{display:flex;gap:14px;overflow-x:auto;scroll-behavior:smooth;padding:0 4px 10px;scroll-snap-type:x mandatory}" +
       ".gt-strip::-webkit-scrollbar{height:6px}" +
       ".gt-strip::-webkit-scrollbar-thumb{background:rgba(0,0,0,.2);border-radius:3px}" +
-      ".gt-card{flex:0 0 220px;scroll-snap-align:start;background:#fff;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.16);padding:12px 14px;cursor:pointer;border:1px solid rgba(0,0,0,.06)}" +
-      ".gt-card:hover{transform:translateY(-2px);transition:.15s}" +
-      ".gt-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:32px;height:32px;border-radius:50%;border:none;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.2);cursor:pointer;font-size:18px;line-height:1;color:#123B4C}" +
+      ".gt-cardwrap{flex:0 0 150px;scroll-snap-align:start}" +
+      ".gt-tile{position:relative;height:120px;border-radius:14px;background:linear-gradient(150deg,#1B5163,#0E2E3B);box-shadow:0 10px 24px rgba(0,0,0,.22);cursor:pointer;color:#fff;padding:12px;display:flex;flex-direction:column;justify-content:space-between;border:2px solid rgba(255,255,255,.65);transition:.15s}" +
+      ".gt-tile:hover{transform:translateY(-3px)}" +
+      ".gt-tile-top{display:flex;justify-content:flex-end;min-height:18px}" +
+      ".gt-price{background:#E8850F;color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px}" +
+      ".gt-tile-mid{text-align:center}" +
+      ".gt-count{font-size:26px;font-weight:800;line-height:1;display:block}" +
+      ".gt-countlbl{font-size:10px;opacity:.8;text-transform:uppercase;letter-spacing:.06em}" +
+      ".gt-tile-bar{background:rgba(255,255,255,.25);border-radius:999px;height:5px;overflow:hidden;margin:4px 0 2px}" +
+      ".gt-tile-bar>div{height:100%;background:#E8850F}" +
+      ".gt-tile-left{font-size:11px;font-weight:600;color:#FFD9A8;text-align:center}" +
+      ".gt-place-lbl{margin-top:8px;text-align:center;font-size:12px;font-weight:600;color:#123B4C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}" +
+      ".gt-arrow{position:absolute;top:44px;z-index:4;width:32px;height:32px;border-radius:50%;border:none;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.2);cursor:pointer;font-size:18px;line-height:1;color:#123B4C}" +
       ".gt-places{display:flex;flex-wrap:wrap;gap:8px;max-height:170px;overflow-y:auto;padding:4px 2px}" +
       ".gt-place{border:1px solid var(--soft2,#e5e7eb);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;user-select:none;transition:.15s}" +
-      ".gt-place.gt-on{background:#123B4C;color:#fff;border-color:#123B4C}"
+      ".gt-place.gt-on{background:#123B4C;color:#fff;border-color:#123B4C}" +
+      ".gt-day{border:1px solid var(--soft2,#e5e7eb);border-radius:10px;padding:6px 10px;font-size:12px;cursor:pointer;user-select:none}" +
+      ".gt-day.gt-on{background:#E8850F;color:#fff;border-color:#E8850F}" +
+      ".gt-vote-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--soft2,#eee)}"
     document.head.appendChild(st)
   }
 
@@ -710,6 +992,9 @@
     scrollToOpen: scrollToOpen,
     scrollStrip: scrollStrip,
     togglePlace: togglePlace,
+    toggleDay: toggleDay,
+    vote: vote,
+    notifyAll: notifyAll,
     loadOpen: loadOpen,
     openQuote: openQuote,
     submitQuote: submitQuote,
