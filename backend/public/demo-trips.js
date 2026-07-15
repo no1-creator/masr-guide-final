@@ -3,6 +3,7 @@
  * the "Create your journey" banner: top half inside the dark banner, bottom
  * half below it. Auto-scroll + always-visible desktop nav arrows. Click a card
  * / Join / Vote to open a details modal. English UI, USD prices. No backend.
+ * Also hides the OLD group-trips.js Arabic row (its banner stays).
  */
 (function () {
   'use strict';
@@ -355,13 +356,25 @@
     requestAnimationFrame(tick);
   }
 
+  // ---- Hide the OLD group-trips.js Arabic row (its banner stays) --------
+  function hideOld() {
+    var sel = ['.gt-open-row', '#gt-open-row', '.gt-strip'];
+    for (var i = 0; i < sel.length; i++) {
+      var els = document.querySelectorAll(sel[i]);
+      for (var j = 0; j < els.length; j++) { els[j].style.display = 'none'; }
+    }
+  }
+
   // ---- Init -------------------------------------------------------------
   function init() {
+    hideOld();
     var banner = findBanner();
-    if (banner) { mount(banner); return true; }
+    if (banner) { mount(banner); hideOld(); return true; }
     return false;
   }
   function boot() {
+    var ht = 0;
+    var hv = setInterval(function () { hideOld(); if (++ht > 40) clearInterval(hv); }, 300);
     if (init()) return;
     var tries = 0;
     var iv = setInterval(function () { tries++; if (init() || tries > 60) clearInterval(iv); }, 250);
