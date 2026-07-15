@@ -44,6 +44,23 @@
     return document.querySelector('#gt-open-row') || document.querySelector('.gt-open-row');
   }
 
+  // ---- Hide the banner blurb line that gets covered by the cards ---------
+  // Uses visibility:hidden (NOT display:none) so the banner keeps the exact
+  // same size and the trips strip stays in the exact same place.
+  function hideBannerBlurb() {
+    var phrase = 'pick the places you want to visit';
+    var nodes = document.querySelectorAll('p, span, div, small');
+    var best = null, bestLen = 100000;
+    for (var i = 0; i < nodes.length; i++) {
+      var tx = (nodes[i].textContent || '').trim();
+      if (!tx || tx.length > 400) continue;
+      if (tx.toLowerCase().indexOf(phrase) !== -1 && tx.length < bestLen) {
+        best = nodes[i]; bestLen = tx.length;
+      }
+    }
+    if (best) best.style.visibility = 'hidden';
+  }
+
   // ---- Details modal ----------------------------------------------------
   function closeModal() {
     var m = document.getElementById(MODAL_ID);
@@ -309,6 +326,9 @@
     // Drop OUR strip exactly where the site's row sits, then hide the old one.
     anchor.parentNode.insertBefore(wrap, anchor);
     anchor.style.display = 'none';
+    hideBannerBlurb();
+    var bt = 0;
+    var bv = setInterval(function () { hideBannerBlurb(); if (++bt > 10) clearInterval(bv); }, 300);
 
     // Continuous auto-scroll with a seamless wrap.
     function tick() {
