@@ -1,9 +1,8 @@
 /* RaGo — Open Trips strip (frontend-only demo)
- * A compact, auto-moving strip of demo trips that STRADDLES the bottom edge of
- * the "Create your journey" banner: top half inside the dark banner, bottom
- * half below it. Auto-scroll + always-visible desktop nav arrows. Click a card
- * / Join / Vote to open a details modal. English UI, USD prices. No backend.
- * Also hides the OLD group-trips.js Arabic row (its banner stays).
+ * Simple & reliable: a horizontal strip of trip cards that MOVES left/right
+ * (continuous auto-scroll + always-visible desktop arrows). English UI, USD.
+ * Also hides the OLD group-trips.js Arabic row (its banner stays untouched).
+ * No layout hacks — sits cleanly just under the "Create your journey" banner.
  */
 (function () {
   'use strict';
@@ -75,6 +74,15 @@
       if (r2.height > 90 && r2.width > 300) return el;
     }
     return start.parentElement;
+  }
+
+  // ---- Hide the OLD group-trips.js Arabic row (its banner stays) --------
+  function hideOld() {
+    var sel = ['.gt-open-row', '#gt-open-row', '.gt-strip'];
+    for (var i = 0; i < sel.length; i++) {
+      var els = document.querySelectorAll(sel[i]);
+      for (var j = 0; j < els.length; j++) { els[j].style.display = 'none'; }
+    }
   }
 
   // ---- Details modal ----------------------------------------------------
@@ -217,45 +225,55 @@
     document.addEventListener('keydown', onEsc);
   }
 
-  // ---- Card (compact) ---------------------------------------------------
+  // ---- Card -------------------------------------------------------------
   function buildCard(t) {
     var card = document.createElement('div');
     card.style.cssText = [
-      'flex:0 0 auto', 'width:130px',
-      'background:#ffffff', 'border:1px solid #E7EDF0', 'border-radius:12px', 'overflow:hidden',
-      'box-shadow:0 8px 20px rgba(9,25,33,.28)', 'font-family:inherit', 'cursor:pointer',
+      'flex:0 0 auto', 'width:168px',
+      'background:#ffffff', 'border:1px solid #E7EDF0', 'border-radius:14px', 'overflow:hidden',
+      'box-shadow:0 10px 24px rgba(9,25,33,.16)', 'font-family:inherit', 'cursor:pointer',
       'transition:transform .15s ease, box-shadow .15s ease'
     ].join(';');
-    card.onmouseenter = function () { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 12px 26px rgba(9,25,33,.36)'; };
-    card.onmouseleave = function () { card.style.transform = 'none'; card.style.boxShadow = '0 8px 20px rgba(9,25,33,.28)'; };
+    card.onmouseenter = function () { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 14px 30px rgba(9,25,33,.24)'; };
+    card.onmouseleave = function () { card.style.transform = 'none'; card.style.boxShadow = '0 10px 24px rgba(9,25,33,.16)'; };
     card.onclick = function () { openModal(t); };
 
     var media = document.createElement('div');
-    media.style.cssText = ['position:relative', 'height:56px', 'background:linear-gradient(135deg,' + t.g[0] + ',' + t.g[1] + ')'].join(';');
+    media.style.cssText = ['position:relative', 'height:92px', 'background:linear-gradient(135deg,' + t.g[0] + ',' + t.g[1] + ')'].join(';');
     if (t.vote) {
       var pill = document.createElement('span');
       pill.textContent = 'Vote open';
-      pill.style.cssText = ['position:absolute', 'top:6px', 'left:6px', 'background:#FFD9A8', 'color:#7a3d00', 'font-size:9px', 'font-weight:700', 'padding:2px 6px', 'border-radius:999px'].join(';');
+      pill.style.cssText = ['position:absolute', 'top:8px', 'left:8px', 'background:#FFD9A8', 'color:#7a3d00', 'font-size:10px', 'font-weight:700', 'padding:3px 8px', 'border-radius:999px'].join(';');
       media.appendChild(pill);
     }
     card.appendChild(media);
 
     var b = document.createElement('div');
-    b.style.cssText = 'padding:7px 8px 9px';
+    b.style.cssText = 'padding:10px 12px 12px';
     var name = document.createElement('div');
     name.textContent = t.name;
-    name.style.cssText = 'font-size:12px;font-weight:700;color:#123B4C;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    name.style.cssText = 'font-size:14px;font-weight:700;color:#123B4C;line-height:1.25';
     b.appendChild(name);
     var meta = document.createElement('div');
     meta.textContent = t.days + ' days · ' + t.joined + ' joined';
-    meta.style.cssText = 'font-size:9.5px;color:#6B7B85;margin-top:2px';
+    meta.style.cssText = 'font-size:11px;color:#6B7B85;margin-top:3px';
     b.appendChild(meta);
     var price = document.createElement('div');
-    price.innerHTML = '<span style="font-size:9.5px;color:#6B7B85">from</span> ' +
-      '<span style="font-size:12.5px;font-weight:800;color:#E8850F">' + usd(t.usd) + '</span>' +
-      '<span style="font-size:9.5px;color:#6B7B85">/pp</span>';
-    price.style.cssText = 'margin-top:5px';
+    price.innerHTML = '<span style="font-size:11px;color:#6B7B85">from</span> ' +
+      '<span style="font-size:14px;font-weight:800;color:#E8850F">' + usd(t.usd) + '</span>' +
+      '<span style="font-size:11px;color:#6B7B85"> / person</span>';
+    price.style.cssText = 'margin-top:6px';
     b.appendChild(price);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = t.vote ? 'Vote now' : 'Join trip';
+    btn.style.cssText = [
+      'width:100%', 'margin-top:9px', 'border:0', 'border-radius:9px', 'padding:8px 0',
+      'font-size:13px', 'font-weight:800', 'cursor:pointer', 'color:#fff',
+      'background:' + (t.vote ? '#123B4C' : '#E8850F')
+    ].join(';');
+    btn.onclick = function (e) { e.stopPropagation(); openModal(t); };
+    b.appendChild(btn);
     card.appendChild(b);
     return card;
   }
@@ -269,11 +287,6 @@
     if (!parent) return;
     var cs = getComputedStyle(banner);
 
-    // Remember the banner's ORIGINAL bottom padding so re-mounts stay stable.
-    var origPB = banner.getAttribute('data-rago-pb');
-    if (origPB === null) { origPB = parseFloat(cs.paddingBottom) || 0; banner.setAttribute('data-rago-pb', origPB); }
-    else { origPB = parseFloat(origPB); }
-
     var wrap = document.createElement('div');
     wrap.id = CONTAINER_ID;
     wrap.style.boxSizing = 'border-box';
@@ -281,88 +294,76 @@
     wrap.style.zIndex = '5';
     wrap.style.marginLeft = cs.marginLeft;
     wrap.style.marginRight = cs.marginRight;
+    wrap.style.marginTop = '-18px'; // tuck slightly toward the banner (safe, no overlap)
     if (cs.maxWidth && cs.maxWidth !== 'none') wrap.style.maxWidth = cs.maxWidth;
+    wrap.style.paddingLeft = cs.paddingLeft;
+    wrap.style.paddingRight = cs.paddingRight;
+
+    var head = document.createElement('div');
+    head.textContent = 'OPEN TRIPS';
+    head.style.cssText = 'font-size:12px;font-weight:800;letter-spacing:.08em;color:#123B4C;margin:0 0 8px';
+    wrap.appendChild(head);
 
     var viewport = document.createElement('div');
-    viewport.style.cssText = 'position:relative;overflow:hidden;padding:2px 0';
+    viewport.style.cssText = 'position:relative;overflow:hidden';
 
     var track = document.createElement('div');
     track.className = 'rago-track';
     track.style.cssText = [
-      'display:flex', 'gap:12px', 'overflow-x:auto',
-      'padding-left:' + cs.paddingLeft, 'padding-right:' + cs.paddingRight,
-      'padding-top:6px', 'padding-bottom:6px', '-webkit-overflow-scrolling:touch'
+      'display:flex', 'gap:14px', 'overflow-x:auto', 'padding:6px 2px 14px', '-webkit-overflow-scrolling:touch'
     ].join(';');
     track.style.setProperty('scrollbar-width', 'none');
-    var styleTag = document.createElement('style');
-    styleTag.textContent = '#' + CONTAINER_ID + ' .rago-track::-webkit-scrollbar{display:none}';
-    wrap.appendChild(styleTag);
+    var st = document.createElement('style');
+    st.textContent = '#' + CONTAINER_ID + ' .rago-track::-webkit-scrollbar{display:none}';
+    wrap.appendChild(st);
 
-    var items = TRIPS.concat(TRIPS); // duplicate for seamless infinite loop
-    items.forEach(function (t) { track.appendChild(buildCard(t)); });
+    TRIPS.concat(TRIPS).forEach(function (t) { track.appendChild(buildCard(t)); }); // doubled for seamless loop
     viewport.appendChild(track);
 
-    // Always-visible desktop nav arrows.
-    var arrowState = { paused: false };
-    function makeArrow(dir) {
-      var bt = document.createElement('button');
-      bt.type = 'button';
-      bt.setAttribute('aria-label', dir < 0 ? 'Previous trips' : 'Next trips');
-      bt.innerHTML = dir < 0 ? '&#8249;' : '&#8250;';
-      bt.style.cssText = [
-        'position:absolute', 'top:50%', 'transform:translateY(-50%)',
-        (dir < 0 ? 'left:6px' : 'right:6px'), 'z-index:4',
-        'width:34px', 'height:34px', 'border-radius:999px', 'border:0',
-        'background:rgba(18,59,76,.95)', 'color:#fff', 'font-size:20px', 'line-height:1', 'cursor:pointer',
-        'display:flex', 'align-items:center', 'justify-content:center', 'box-shadow:0 3px 10px rgba(0,0,0,.3)',
-        'opacity:.92', 'transition:opacity .15s ease, transform .15s ease'
+    var paused = { v: false };
+    function arrow(dir) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', dir < 0 ? 'Previous trips' : 'Next trips');
+      b.innerHTML = dir < 0 ? '&#8249;' : '&#8250;';
+      b.style.cssText = [
+        'position:absolute', 'top:calc(50% + 4px)', 'transform:translateY(-50%)',
+        (dir < 0 ? 'left:2px' : 'right:2px'), 'z-index:6',
+        'width:40px', 'height:40px', 'border-radius:999px', 'border:0',
+        'background:#123B4C', 'color:#fff', 'font-size:24px', 'line-height:1', 'cursor:pointer',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'box-shadow:0 4px 14px rgba(0,0,0,.35)', 'opacity:.95', 'transition:opacity .15s ease'
       ].join(';');
-      bt.onmouseenter = function () { bt.style.opacity = '1'; };
-      bt.onmouseleave = function () { bt.style.opacity = '.92'; };
-      bt.onclick = function () {
-        arrowState.paused = true;
-        var half = track.scrollWidth / 2;
-        if (dir < 0 && track.scrollLeft < 300) track.scrollLeft += half;
-        track.scrollBy({ left: dir * 300, behavior: 'smooth' });
-        setTimeout(function () { arrowState.paused = false; }, 1000);
+      b.onmouseenter = function () { b.style.opacity = '1'; };
+      b.onmouseleave = function () { b.style.opacity = '.95'; };
+      b.onclick = function () {
+        paused.v = true;
+        var hw = track.scrollWidth / 2;
+        if (dir < 0 && track.scrollLeft < 340) track.scrollLeft += hw;
+        track.scrollBy({ left: dir * 340, behavior: 'smooth' });
+        setTimeout(function () { paused.v = false; }, 1200);
       };
-      return bt;
+      return b;
     }
-    viewport.appendChild(makeArrow(-1));
-    viewport.appendChild(makeArrow(1));
-    viewport.addEventListener('mouseenter', function () { arrowState.paused = true; });
-    viewport.addEventListener('mouseleave', function () { arrowState.paused = false; });
+    viewport.appendChild(arrow(-1));
+    viewport.appendChild(arrow(1));
+    viewport.addEventListener('mouseenter', function () { paused.v = true; });
+    viewport.addEventListener('mouseleave', function () { paused.v = false; });
 
     wrap.appendChild(viewport);
     parent.insertBefore(wrap, banner.nextSibling);
-
-    // Straddle the banner's bottom edge: top half inside the banner (over the
-    // extra dark padding we add), bottom half below it.
-    var h = wrap.getBoundingClientRect().height || 130;
-    var half = Math.round(h / 2);
-    banner.style.paddingBottom = (origPB + half + 10) + 'px';
-    wrap.style.marginTop = (-half) + 'px';
 
     // Continuous auto-scroll with seamless wrap.
     function tick() {
       if (!document.getElementById(CONTAINER_ID)) return;
       var hw = track.scrollWidth / 2;
-      if (!arrowState.paused && hw > 0) {
-        track.scrollLeft += 0.6;
+      if (!paused.v && hw > 0) {
+        track.scrollLeft += 0.5;
         if (track.scrollLeft >= hw) track.scrollLeft -= hw;
       }
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
-  }
-
-  // ---- Hide the OLD group-trips.js Arabic row (its banner stays) --------
-  function hideOld() {
-    var sel = ['.gt-open-row', '#gt-open-row', '.gt-strip'];
-    for (var i = 0; i < sel.length; i++) {
-      var els = document.querySelectorAll(sel[i]);
-      for (var j = 0; j < els.length; j++) { els[j].style.display = 'none'; }
-    }
   }
 
   // ---- Init -------------------------------------------------------------
