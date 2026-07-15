@@ -61,6 +61,32 @@
     if (best) best.style.visibility = 'hidden';
   }
 
+  // ---- Widen the banner + trips to match the site's normal container ----
+  // Pulls #gt-entry outward with negative margins ONLY as much as needed to
+  // line up with a normal .container section on the page (never wider). Works
+  // for both desktop and mobile because it measures the live layout.
+  function widenBanner() {
+    var entry = document.getElementById('gt-entry');
+    if (!entry) return;
+    // Re-baseline to centered before measuring (keeps it stable on resize).
+    entry.style.marginLeft = 'auto';
+    entry.style.marginRight = 'auto';
+    var ref = null;
+    var conts = document.querySelectorAll('.container');
+    for (var i = 0; i < conts.length; i++) {
+      var c = conts[i];
+      if (c === entry || c.contains(entry) || entry.contains(c)) continue;
+      if (c.getBoundingClientRect().width > 200) { ref = c; break; }
+    }
+    if (!ref) return;
+    var er = entry.getBoundingClientRect();
+    var rr = ref.getBoundingClientRect();
+    var leftDiff = er.left - rr.left;
+    var rightDiff = rr.right - er.right;
+    if (leftDiff > 2) entry.style.marginLeft = (-leftDiff) + 'px';
+    if (rightDiff > 2) entry.style.marginRight = (-rightDiff) + 'px';
+  }
+
   // ---- Details modal ----------------------------------------------------
   function closeModal() {
     var m = document.getElementById(MODAL_ID);
@@ -337,8 +363,13 @@
     anchor.parentNode.insertBefore(wrap, anchor);
     anchor.style.display = 'none';
     hideBannerBlurb();
+    widenBanner();
     var bt = 0;
-    var bv = setInterval(function () { hideBannerBlurb(); if (++bt > 10) clearInterval(bv); }, 300);
+    var bv = setInterval(function () { hideBannerBlurb(); widenBanner(); if (++bt > 10) clearInterval(bv); }, 300);
+    if (!window.__ragoResizeBound) {
+      window.__ragoResizeBound = true;
+      window.addEventListener('resize', function () { widenBanner(); });
+    }
 
     // Continuous auto-scroll with a seamless wrap.
     function tick() {
