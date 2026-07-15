@@ -1,8 +1,8 @@
-/* RaGo — Open Trips showcase (frontend-only demo)
- * A compact, auto-moving strip of demo trips hugging the bottom of the
- * "Create your journey" banner. Desktop nav arrows (no touch needed).
- * Click a card / Join / Vote to open a details modal. English UI, USD prices.
- * No backend calls — pure frontend demo.
+/* RaGo — Open Trips strip (frontend-only demo)
+ * A compact, auto-moving strip of demo trips that STRADDLES the bottom edge of
+ * the "Create your journey" banner: top half inside the dark banner, bottom
+ * half below it. Auto-scroll + always-visible desktop nav arrows. Click a card
+ * / Join / Vote to open a details modal. English UI, USD prices. No backend.
  */
 (function () {
   'use strict';
@@ -10,7 +10,6 @@
   var CONTAINER_ID = 'rago-open-trips';
   var MODAL_ID = 'rago-trip-modal';
 
-  // ---- Demo data (frontend only) ----------------------------------------
   var TRIPS = [
     { name: 'Giza Pyramids',   g: ['#E8850F', '#B45F00'], usd: 50,  days: 9,  joined: 6, vote: false },
     { name: 'Luxor',           g: ['#123B4C', '#0E2E3B'], usd: 65,  days: 12, joined: 4, vote: false },
@@ -47,18 +46,16 @@
     if (a < 0.3) return false;
     return (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) < 110;
   }
-
   function bannerish(el) {
     var cs = getComputedStyle(el);
     return isDark(cs.backgroundColor) || /gradient/i.test(cs.backgroundImage || '');
   }
-
   function findBanner() {
     var nodes = document.querySelectorAll('h1,h2,h3,h4,p,span,button,a');
     var start = null;
     for (var i = 0; i < nodes.length; i++) {
       var t = (nodes[i].textContent || '').trim();
-      if (!t || t.length > 120) continue; // skip large wrapper containers
+      if (!t || t.length > 120) continue;
       if (/design your own trip/i.test(t) || /create your journey/i.test(t)) {
         if (!start || t.length < (start.textContent || '').trim().length) start = nodes[i];
       }
@@ -87,22 +84,41 @@
   }
   function onEsc(e) { if (e.key === 'Escape') closeModal(); }
 
+  function primaryButton(text, bg) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.style.cssText = [
+      'width:100%', 'border:0', 'border-radius:10px', 'padding:11px 0',
+      'font-size:14px', 'font-weight:800', 'cursor:pointer', 'color:#fff', 'background:' + bg
+    ].join(';');
+    return b;
+  }
+  function showDone(actions, msg) {
+    actions.innerHTML = '';
+    var d = document.createElement('div');
+    d.textContent = msg;
+    d.style.cssText = [
+      'background:#EAF6EE', 'border:1px solid #B7E4C7', 'color:#2D6A4F',
+      'border-radius:10px', 'padding:12px', 'font-size:13px', 'font-weight:600'
+    ].join(';');
+    actions.appendChild(d);
+  }
+
   function openModal(t) {
     closeModal();
     var overlay = document.createElement('div');
     overlay.id = MODAL_ID;
     overlay.style.cssText = [
       'position:fixed', 'inset:0', 'background:rgba(9,25,33,.6)', 'z-index:99999',
-      'display:flex', 'align-items:center', 'justify-content:center', 'padding:16px',
-      'font-family:inherit'
+      'display:flex', 'align-items:center', 'justify-content:center', 'padding:16px', 'font-family:inherit'
     ].join(';');
     overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
 
     var dialog = document.createElement('div');
     dialog.style.cssText = [
-      'background:#fff', 'width:100%', 'max-width:440px', 'border-radius:18px',
-      'overflow:hidden', 'box-shadow:0 24px 60px rgba(0,0,0,.35)', 'max-height:90vh',
-      'display:flex', 'flex-direction:column'
+      'background:#fff', 'width:100%', 'max-width:440px', 'border-radius:18px', 'overflow:hidden',
+      'box-shadow:0 24px 60px rgba(0,0,0,.35)', 'max-height:90vh', 'display:flex', 'flex-direction:column'
     ].join(';');
 
     var header = document.createElement('div');
@@ -115,15 +131,14 @@
     hName.textContent = t.name;
     hName.style.cssText = 'color:#fff;font-size:20px;font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.3)';
     header.appendChild(hName);
-
     var close = document.createElement('button');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close');
     close.innerHTML = '&times;';
     close.style.cssText = [
-      'position:absolute', 'top:10px', 'right:10px', 'width:32px', 'height:32px',
-      'border:0', 'border-radius:999px', 'background:rgba(255,255,255,.9)',
-      'color:#123B4C', 'font-size:20px', 'line-height:1', 'cursor:pointer'
+      'position:absolute', 'top:10px', 'right:10px', 'width:32px', 'height:32px', 'border:0',
+      'border-radius:999px', 'background:rgba(255,255,255,.9)', 'color:#123B4C', 'font-size:20px',
+      'line-height:1', 'cursor:pointer'
     ].join(';');
     close.onclick = closeModal;
     header.appendChild(close);
@@ -155,63 +170,45 @@
     body.appendChild(incTitle);
     var ul = document.createElement('ul');
     ul.style.cssText = 'margin:0 0 8px;padding-left:18px;color:#33454E;font-size:13px;line-height:1.7';
-    INCLUDES.forEach(function (it) {
-      var li = document.createElement('li');
-      li.textContent = it;
-      ul.appendChild(li);
-    });
+    INCLUDES.forEach(function (it) { var li = document.createElement('li'); li.textContent = it; ul.appendChild(li); });
     body.appendChild(ul);
 
-    // Actions area (differs for vote vs join)
     var actions = document.createElement('div');
     actions.style.cssText = 'margin-top:12px';
-
     if (t.vote) {
       var vTitle = document.createElement('div');
       vTitle.textContent = 'Choose your preferred dates';
       vTitle.style.cssText = 'font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#6B7B85;margin-bottom:8px';
       actions.appendChild(vTitle);
-
       var chosen = { i: 0 };
       VOTE_DATES.forEach(function (d, idx) {
         var row = document.createElement('label');
         row.style.cssText = [
-          'display:flex', 'align-items:center', 'justify-content:space-between',
-          'gap:10px', 'border:1px solid #E7EDF0', 'border-radius:10px',
-          'padding:9px 12px', 'margin-bottom:8px', 'cursor:pointer', 'font-size:13px', 'color:#123B4C'
+          'display:flex', 'align-items:center', 'justify-content:space-between', 'gap:10px',
+          'border:1px solid #E7EDF0', 'border-radius:10px', 'padding:9px 12px', 'margin-bottom:8px',
+          'cursor:pointer', 'font-size:13px', 'color:#123B4C'
         ].join(';');
         var left = document.createElement('span');
         left.style.cssText = 'display:flex;align-items:center;gap:8px';
         var radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'rago-vote';
+        radio.type = 'radio'; radio.name = 'rago-vote';
         if (idx === 0) radio.checked = true;
         radio.onchange = function () { chosen.i = idx; };
         left.appendChild(radio);
-        var lbl = document.createElement('span');
-        lbl.textContent = d.label;
-        left.appendChild(lbl);
+        var lbl = document.createElement('span'); lbl.textContent = d.label; left.appendChild(lbl);
         row.appendChild(left);
-        var cnt = document.createElement('span');
-        cnt.textContent = d.votes + ' votes';
-        cnt.style.cssText = 'font-size:11px;color:#6B7B85';
-        row.appendChild(cnt);
+        var cnt = document.createElement('span'); cnt.textContent = d.votes + ' votes';
+        cnt.style.cssText = 'font-size:11px;color:#6B7B85'; row.appendChild(cnt);
         actions.appendChild(row);
       });
-
       var voteBtn = primaryButton('Submit vote', '#123B4C');
-      voteBtn.onclick = function () {
-        showDone(actions, 'Thanks! Your vote for ' + VOTE_DATES[chosen.i].label + ' was recorded. (demo)');
-      };
+      voteBtn.onclick = function () { showDone(actions, 'Thanks! Your vote for ' + VOTE_DATES[chosen.i].label + ' was recorded. (demo)'); };
       actions.appendChild(voteBtn);
     } else {
       var joinBtn = primaryButton('Confirm join', '#E8850F');
-      joinBtn.onclick = function () {
-        showDone(actions, "You're in! We'll email your full itinerary shortly. (demo)");
-      };
+      joinBtn.onclick = function () { showDone(actions, "You're in! We'll email your full itinerary shortly. (demo)"); };
       actions.appendChild(joinBtn);
     }
-
     body.appendChild(actions);
     dialog.appendChild(body);
     overlay.appendChild(dialog);
@@ -219,96 +216,46 @@
     document.addEventListener('keydown', onEsc);
   }
 
-  function primaryButton(text, bg) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = text;
-    b.style.cssText = [
-      'width:100%', 'border:0', 'border-radius:10px', 'padding:11px 0',
-      'font-size:14px', 'font-weight:800', 'cursor:pointer', 'color:#fff', 'background:' + bg
-    ].join(';');
-    return b;
-  }
-
-  function showDone(actions, msg) {
-    actions.innerHTML = '';
-    var d = document.createElement('div');
-    d.textContent = msg;
-    d.style.cssText = [
-      'background:#EAF6EE', 'border:1px solid #B7E4C7', 'color:#2D6A4F',
-      'border-radius:10px', 'padding:12px', 'font-size:13px', 'font-weight:600'
-    ].join(';');
-    actions.appendChild(d);
-  }
-
-  // ---- Card -------------------------------------------------------------
+  // ---- Card (compact) ---------------------------------------------------
   function buildCard(t) {
     var card = document.createElement('div');
     card.style.cssText = [
-      'flex:0 0 auto', 'width:140px',
-      'background:#ffffff', 'border:1px solid #E7EDF0', 'border-radius:13px',
-      'overflow:hidden', 'box-shadow:0 6px 18px rgba(18,59,76,.14)',
-      'font-family:inherit', 'cursor:pointer', 'transition:transform .15s ease, box-shadow .15s ease'
+      'flex:0 0 auto', 'width:130px',
+      'background:#ffffff', 'border:1px solid #E7EDF0', 'border-radius:12px', 'overflow:hidden',
+      'box-shadow:0 8px 20px rgba(9,25,33,.28)', 'font-family:inherit', 'cursor:pointer',
+      'transition:transform .15s ease, box-shadow .15s ease'
     ].join(';');
-    card.onmouseenter = function () {
-      card.style.transform = 'translateY(-3px)';
-      card.style.boxShadow = '0 10px 24px rgba(18,59,76,.22)';
-    };
-    card.onmouseleave = function () {
-      card.style.transform = 'none';
-      card.style.boxShadow = '0 6px 18px rgba(18,59,76,.14)';
-    };
+    card.onmouseenter = function () { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 12px 26px rgba(9,25,33,.36)'; };
+    card.onmouseleave = function () { card.style.transform = 'none'; card.style.boxShadow = '0 8px 20px rgba(9,25,33,.28)'; };
     card.onclick = function () { openModal(t); };
 
     var media = document.createElement('div');
-    media.style.cssText = [
-      'position:relative', 'height:70px',
-      'background:linear-gradient(135deg,' + t.g[0] + ',' + t.g[1] + ')'
-    ].join(';');
+    media.style.cssText = ['position:relative', 'height:56px', 'background:linear-gradient(135deg,' + t.g[0] + ',' + t.g[1] + ')'].join(';');
     if (t.vote) {
       var pill = document.createElement('span');
       pill.textContent = 'Vote open';
-      pill.style.cssText = [
-        'position:absolute', 'top:7px', 'left:7px', 'background:#FFD9A8',
-        'color:#7a3d00', 'font-size:9px', 'font-weight:700', 'letter-spacing:.3px',
-        'padding:2px 7px', 'border-radius:999px'
-      ].join(';');
+      pill.style.cssText = ['position:absolute', 'top:6px', 'left:6px', 'background:#FFD9A8', 'color:#7a3d00', 'font-size:9px', 'font-weight:700', 'padding:2px 6px', 'border-radius:999px'].join(';');
       media.appendChild(pill);
     }
     card.appendChild(media);
 
-    var bodyEl = document.createElement('div');
-    bodyEl.style.cssText = 'padding:8px 9px 10px';
-
+    var b = document.createElement('div');
+    b.style.cssText = 'padding:7px 8px 9px';
     var name = document.createElement('div');
     name.textContent = t.name;
-    name.style.cssText = 'font-size:12.5px;font-weight:700;color:#123B4C;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-    bodyEl.appendChild(name);
-
+    name.style.cssText = 'font-size:12px;font-weight:700;color:#123B4C;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    b.appendChild(name);
     var meta = document.createElement('div');
     meta.textContent = t.days + ' days · ' + t.joined + ' joined';
-    meta.style.cssText = 'font-size:10px;color:#6B7B85;margin-top:2px';
-    bodyEl.appendChild(meta);
-
+    meta.style.cssText = 'font-size:9.5px;color:#6B7B85;margin-top:2px';
+    b.appendChild(meta);
     var price = document.createElement('div');
-    price.innerHTML = '<span style="font-size:10px;color:#6B7B85">from</span> ' +
-      '<span style="font-size:13px;font-weight:800;color:#E8850F">' + usd(t.usd) + '</span>' +
-      '<span style="font-size:10px;color:#6B7B85">/pp</span>';
-    price.style.cssText = 'margin-top:6px';
-    bodyEl.appendChild(price);
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = t.vote ? 'Vote' : 'Join';
-    btn.style.cssText = [
-      'margin-top:8px', 'width:100%', 'border:0', 'border-radius:8px',
-      'padding:6px 0', 'font-size:11px', 'font-weight:700', 'cursor:pointer',
-      'color:#fff', 'background:' + (t.vote ? '#123B4C' : '#E8850F')
-    ].join(';');
-    btn.onclick = function (e) { e.stopPropagation(); openModal(t); };
-    bodyEl.appendChild(btn);
-
-    card.appendChild(bodyEl);
+    price.innerHTML = '<span style="font-size:9.5px;color:#6B7B85">from</span> ' +
+      '<span style="font-size:12.5px;font-weight:800;color:#E8850F">' + usd(t.usd) + '</span>' +
+      '<span style="font-size:9.5px;color:#6B7B85">/pp</span>';
+    price.style.cssText = 'margin-top:5px';
+    b.appendChild(price);
+    card.appendChild(b);
     return card;
   }
 
@@ -321,87 +268,87 @@
     if (!parent) return;
     var cs = getComputedStyle(banner);
 
+    // Remember the banner's ORIGINAL bottom padding so re-mounts stay stable.
+    var origPB = banner.getAttribute('data-rago-pb');
+    if (origPB === null) { origPB = parseFloat(cs.paddingBottom) || 0; banner.setAttribute('data-rago-pb', origPB); }
+    else { origPB = parseFloat(origPB); }
+
     var wrap = document.createElement('div');
     wrap.id = CONTAINER_ID;
     wrap.style.boxSizing = 'border-box';
-    wrap.style.display = 'block';
     wrap.style.position = 'relative';
     wrap.style.zIndex = '5';
     wrap.style.marginLeft = cs.marginLeft;
     wrap.style.marginRight = cs.marginRight;
     if (cs.maxWidth && cs.maxWidth !== 'none') wrap.style.maxWidth = cs.maxWidth;
-    wrap.style.width = 'auto';
-    // Hug the bottom of the banner by overlapping into its bottom padding.
-    var pad = parseFloat(cs.paddingBottom) || 0;
-    var overlap = Math.min(Math.max(pad - 6, 0), 34);
-    wrap.style.marginTop = (-overlap) + 'px';
 
-    // Viewport clips the strip; track is the horizontal scroller.
     var viewport = document.createElement('div');
-    viewport.style.cssText = 'position:relative;overflow:hidden;padding:10px 0 2px';
+    viewport.style.cssText = 'position:relative;overflow:hidden;padding:2px 0';
 
     var track = document.createElement('div');
     track.className = 'rago-track';
     track.style.cssText = [
-      'display:flex', 'gap:12px', 'overflow-x:auto', 'padding:6px 6px',
-      'scroll-behavior:smooth', '-webkit-overflow-scrolling:touch'
+      'display:flex', 'gap:12px', 'overflow-x:auto',
+      'padding-left:' + cs.paddingLeft, 'padding-right:' + cs.paddingRight,
+      'padding-top:6px', 'padding-bottom:6px', '-webkit-overflow-scrolling:touch'
     ].join(';');
     track.style.setProperty('scrollbar-width', 'none');
     var styleTag = document.createElement('style');
     styleTag.textContent = '#' + CONTAINER_ID + ' .rago-track::-webkit-scrollbar{display:none}';
     wrap.appendChild(styleTag);
 
-    // Render the list twice for a seamless infinite loop.
-    var items = TRIPS.concat(TRIPS);
+    var items = TRIPS.concat(TRIPS); // duplicate for seamless infinite loop
     items.forEach(function (t) { track.appendChild(buildCard(t)); });
-
     viewport.appendChild(track);
 
-    // Desktop nav arrows (appear on hover).
+    // Always-visible desktop nav arrows.
     var arrowState = { paused: false };
     function makeArrow(dir) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('aria-label', dir < 0 ? 'Previous trips' : 'Next trips');
-      b.innerHTML = dir < 0 ? '&#8249;' : '&#8250;';
-      b.style.cssText = [
+      var bt = document.createElement('button');
+      bt.type = 'button';
+      bt.setAttribute('aria-label', dir < 0 ? 'Previous trips' : 'Next trips');
+      bt.innerHTML = dir < 0 ? '&#8249;' : '&#8250;';
+      bt.style.cssText = [
         'position:absolute', 'top:50%', 'transform:translateY(-50%)',
-        (dir < 0 ? 'left:4px' : 'right:4px'), 'z-index:3',
-        'width:32px', 'height:32px', 'border-radius:999px', 'border:0',
-        'background:rgba(18,59,76,.92)', 'color:#fff', 'font-size:18px', 'line-height:1',
-        'cursor:pointer', 'display:flex', 'align-items:center', 'justify-content:center',
-        'box-shadow:0 3px 10px rgba(0,0,0,.25)', 'opacity:0', 'transition:opacity .18s ease'
+        (dir < 0 ? 'left:6px' : 'right:6px'), 'z-index:4',
+        'width:34px', 'height:34px', 'border-radius:999px', 'border:0',
+        'background:rgba(18,59,76,.95)', 'color:#fff', 'font-size:20px', 'line-height:1', 'cursor:pointer',
+        'display:flex', 'align-items:center', 'justify-content:center', 'box-shadow:0 3px 10px rgba(0,0,0,.3)',
+        'opacity:.92', 'transition:opacity .15s ease, transform .15s ease'
       ].join(';');
-      b.onclick = function () {
+      bt.onmouseenter = function () { bt.style.opacity = '1'; };
+      bt.onmouseleave = function () { bt.style.opacity = '.92'; };
+      bt.onclick = function () {
         arrowState.paused = true;
         var half = track.scrollWidth / 2;
         if (dir < 0 && track.scrollLeft < 300) track.scrollLeft += half;
         track.scrollBy({ left: dir * 300, behavior: 'smooth' });
-        setTimeout(function () { arrowState.paused = false; }, 900);
+        setTimeout(function () { arrowState.paused = false; }, 1000);
       };
-      return b;
+      return bt;
     }
-    var leftArrow = makeArrow(-1);
-    var rightArrow = makeArrow(1);
-    viewport.appendChild(leftArrow);
-    viewport.appendChild(rightArrow);
-    viewport.addEventListener('mouseenter', function () {
-      leftArrow.style.opacity = '1'; rightArrow.style.opacity = '1'; arrowState.paused = true;
-    });
-    viewport.addEventListener('mouseleave', function () {
-      leftArrow.style.opacity = '0'; rightArrow.style.opacity = '0'; arrowState.paused = false;
-    });
+    viewport.appendChild(makeArrow(-1));
+    viewport.appendChild(makeArrow(1));
+    viewport.addEventListener('mouseenter', function () { arrowState.paused = true; });
+    viewport.addEventListener('mouseleave', function () { arrowState.paused = false; });
 
     wrap.appendChild(viewport);
     parent.insertBefore(wrap, banner.nextSibling);
 
+    // Straddle the banner's bottom edge: top half inside the banner (over the
+    // extra dark padding we add), bottom half below it.
+    var h = wrap.getBoundingClientRect().height || 130;
+    var half = Math.round(h / 2);
+    banner.style.paddingBottom = (origPB + half + 10) + 'px';
+    wrap.style.marginTop = (-half) + 'px';
+
     // Continuous auto-scroll with seamless wrap.
     function tick() {
-      if (!document.getElementById(CONTAINER_ID)) return; // stop if removed
-      var half = track.scrollWidth / 2;
-      if (!arrowState.paused && half > 0) {
-        track.scrollLeft += 0.5;
-        if (track.scrollLeft >= half) track.scrollLeft -= half;
+      if (!document.getElementById(CONTAINER_ID)) return;
+      var hw = track.scrollWidth / 2;
+      if (!arrowState.paused && hw > 0) {
+        track.scrollLeft += 0.6;
+        if (track.scrollLeft >= hw) track.scrollLeft -= hw;
       }
       requestAnimationFrame(tick);
     }
@@ -414,14 +361,10 @@
     if (banner) { mount(banner); return true; }
     return false;
   }
-
   function boot() {
     if (init()) return;
     var tries = 0;
-    var iv = setInterval(function () {
-      tries++;
-      if (init() || tries > 60) clearInterval(iv);
-    }, 250);
+    var iv = setInterval(function () { tries++; if (init() || tries > 60) clearInterval(iv); }, 250);
     if (window.MutationObserver) {
       var mo = new MutationObserver(function () {
         if (document.getElementById(CONTAINER_ID)) { mo.disconnect(); return; }
@@ -431,10 +374,6 @@
       setTimeout(function () { mo.disconnect(); }, 20000);
     }
   }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
