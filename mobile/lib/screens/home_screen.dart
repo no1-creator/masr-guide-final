@@ -8,6 +8,7 @@ import '../widgets/common.dart';
 import '../widgets/service_card.dart';
 import '../widgets/banner_slider.dart';
 import 'service_detail_screen.dart';
+import 'group_trips_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,10 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
               titleSpacing: 16,
               title: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(9)),
-                    child: const Text('R', style: TextStyle(color: AppColors.cream, fontWeight: FontWeight.w800, fontSize: 16, height: 1.0)),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset('assets/icon/rago.png', height: 30, width: 30, fit: BoxFit.cover),
                   ),
                   const SizedBox(width: 8),
                   RichText(
@@ -60,6 +60,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         TextSpan(text: 'Ra', style: TextStyle(color: AppColors.blue)),
                         TextSpan(text: 'Go', style: TextStyle(color: AppColors.orange)),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Flexible(
+                    child: Text(
+                      'TOURISM · DEALS & SERVICES',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 8.5, letterSpacing: 1.2, fontWeight: FontWeight.w700, color: AppColors.orange),
                     ),
                   ),
                 ],
@@ -86,6 +95,25 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                   ),
                 ),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: CreateJourneyBanner(),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text('Open group trips',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: GroupTripsStrip(),
               ),
             ),
             if (s.banners.isNotEmpty)
