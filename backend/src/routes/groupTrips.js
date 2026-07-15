@@ -2,6 +2,11 @@
 // Phase A (booking/confirm): money is recorded manually by admin from the
 // dashboard. Wiring a real payment gateway later needs no schema change.
 //
+// v2 adds: creator picks an AVAILABLE DATE RANGE (from -> to); each joiner
+// picks the scattered days that work for them within that range; when the
+// minimum is reached the trip enters 'voting'; members vote on a final day;
+// after the voting deadline the system auto-picks the winning day and confirms.
+//
 // This module is self-contained: it creates its own tables + default settings
 // lazily (idempotent) so it works no matter the import order in server.js.
 import { get, all, run, setting } from "../db.js"
@@ -28,10 +33,10 @@ const DEMO_NAMES = [
 const DEMO_TRIPS = [
   { title: "Giza Pyramids & Sphinx Day Tour", places: "Giza Pyramids, The Egyptian Museum, Cairo", plan: "Full-day guided tour of the Pyramids, the Sphinx and the Grand Egyptian Museum, with lunch by the plateau.", price_small: 2400, price_group: 9000, joined: 6, days: 9 },
   { title: "Luxor: Valley of the Kings & Karnak", places: "Luxor, Karnak Temple, Valley of the Kings", plan: "Two days exploring the East & West Banks of Luxor — Karnak, Hatshepsut Temple and the royal tombs.", price_small: 3200, price_group: 12000, joined: 4, days: 12 },
-  { title: "Aswan & Abu Simbel Escape", places: "Aswan, Abu Simbel, Philae Temple", plan: "Nubian culture, the High Dam, Philae Temple and an early trip to the great temples of Abu Simbel.", price_small: 3600, price_group: 13500, joined: 7, days: 15 },
+  { title: "Aswan & Abu Simbel Escape", places: "Aswan, Abu Simbel, Philae Temple", plan: "Nubian culture, the High Dam, Philae Temple and an early trip to the great temples of Abu Simbel.", price_small: 3600, price_group: 13500, joined: 7, days: 15, voting: true },
   { title: "Hurghada Red Sea Getaway", places: "Hurghada, Red Sea", plan: "Three relaxed days on the Red Sea — a snorkeling boat trip, Orange Bay island and free beach time.", price_small: 3000, price_group: 11000, joined: 5, days: 10 },
   { title: "Sharm El-Sheikh & Ras Mohamed", places: "Sharm El-Sheikh, Ras Mohamed", plan: "Diving and snorkeling in Ras Mohamed National Park plus a desert quad-bike sunset.", price_small: 3400, price_group: 12500, joined: 3, days: 18 },
-  { title: "White Desert & Bahariya Camping", places: "White Desert, Bahariya Oasis", plan: "Overnight desert safari — the White Desert chalk formations, the Black Desert and a Bedouin dinner under the stars.", price_small: 2800, price_group: 10500, joined: 8, days: 7 },
+  { title: "White Desert & Bahariya Camping", places: "White Desert, Bahariya Oasis", plan: "Overnight desert safari — the White Desert chalk formations, the Black Desert and a Bedouin dinner under the stars.", price_small: 2800, price_group: 10500, joined: 8, days: 7, voting: true },
   { title: "Siwa Oasis Adventure", places: "Siwa Oasis", plan: "Salt lakes, Cleopatra's spring, the Oracle Temple and dune surfing in the Great Sand Sea.", price_small: 3800, price_group: 14000, joined: 4, days: 20 },
   { title: "Alexandria Mediterranean Day Trip", places: "Alexandria", plan: "The Bibliotheca, Qaitbay Citadel, the Catacombs and a seafood lunch on the Corniche.", price_small: 2200, price_group: 8500, joined: 6, days: 6 },
   { title: "Dahab & the Blue Hole", places: "Dahab, Blue Hole", plan: "Laid-back Dahab — snorkeling the Blue Hole, the Colored Canyon and a Bedouin camp evening.", price_small: 3100, price_group: 11500, joined: 5, days: 14 },
@@ -39,6 +44,13 @@ const DEMO_TRIPS = [
 ]
 
 let READY = false
+function ensureCol(table, col, type) {
+  try {
+    const cols = all(`PRAGMA table_info(${table})`)
+    if (!cols.some((c) => c.name === col))
+      run(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`)
+  } catch (e) {}
+}
 function ensureGt() {
   if (READY) return
   run(`CREATE TABLE IF NOT EXISTS settings ( key TEXT PRIMARY KEY, value TEXT )`)
@@ -74,6 +86,14 @@ function ensureGt() {
     referral_code TEXT,
     joined_at TEXT NOT NULL
   )`)
+  // --- v2 migrations (added lazily on a live DB, no data loss) ---
+  ensureCol("group_trips", "date_from", "TEXT")
+  ensureCol("group_trips", "date_to", "TEXT")
+  ensureCol("group_trips", "final_date", "TEXT")
+  ensureCol("group_trips", "vote_deadline", "TEXT")
+  ensureCol("group_members", "phone", "TEXT")
+  ensureCol("group_members", "available_days", "TEXT")
+  ensureCol("group_members", "vote_date", "TEXT")
   const defaults = {
     gt_enabled: "1",
     gt_min_people: "10",
@@ -81,6 +101,7 @@ function ensureGt() {
     gt_small_size: "2",
     gt_deadline_days: "7",
     gt_refund_hours: "6",
+    gt_vote_hours: "48",
     gt_vehicle_tiers: JSON.stringify(DEFAULT_TIERS),
   }
   for (const [k, v] of Object.entries(defaults))
@@ -112,6 +133,7 @@ function gtSettings() {
     small_size: Number(setting("gt_small_size", "2")),
     deadline_days: Number(setting("gt_deadline_days", "7")),
     refund_hours: Number(setting("gt_refund_hours", "6")),
+    vote_hours: Number(setting("gt_vote_hours", "48")),
     vehicle_tiers: tiers,
   }
 }
@@ -125,6 +147,80 @@ function seatsCount(tripId) {
     tripId,
   )
   return Number(r.c) || 0
+}
+
+// Parse a JSON-encoded day array stored in group_members.available_days.
+function parseDays(v) {
+  if (!v) return []
+  if (Array.isArray(v)) return v
+  try {
+    const a = JSON.parse(v)
+    return Array.isArray(a) ? a.filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+// Expand an inclusive from..to range into an array of YYYY-MM-DD strings.
+function daysInRange(from, to) {
+  const out = []
+  if (!from || !to) return out
+  let d = new Date(from + "T00:00:00")
+  const end = new Date(to + "T00:00:00")
+  if (isNaN(d.getTime()) || isNaN(end.getTime())) return out
+  let g = 0
+  while (d <= end && g < 400) {
+    out.push(d.toISOString().slice(0, 10))
+    d = new Date(d.getTime() + 86400000)
+    g++
+  }
+  return out
+}
+
+// For a trip, rank candidate days by (votes desc, availability desc, date asc).
+function candidateDays(trip) {
+  const members = all(
+    "SELECT available_days, vote_date FROM group_members WHERE trip_id=? AND status IN ('reserved','paid')",
+    trip.id,
+  )
+  const map = {}
+  const seed = daysInRange(trip.date_from, trip.date_to)
+  for (const day of seed) map[day] = { date: day, available_count: 0, votes: 0 }
+  for (const m of members) {
+    for (const day of parseDays(m.available_days)) {
+      if (!map[day]) map[day] = { date: day, available_count: 0, votes: 0 }
+      map[day].available_count++
+    }
+    if (m.vote_date) {
+      if (!map[m.vote_date])
+        map[m.vote_date] = { date: m.vote_date, available_count: 0, votes: 0 }
+      map[m.vote_date].votes++
+    }
+  }
+  const arr = Object.keys(map).map((k) => map[k])
+  arr.sort(
+    (a, b) =>
+      b.votes - a.votes ||
+      b.available_count - a.available_count ||
+      (a.date < b.date ? -1 : a.date > b.date ? 1 : 0),
+  )
+  return arr
+}
+
+// Auto-finalize a trip whose voting deadline has passed: pick the winning day.
+function maybeFinalize(t) {
+  if (!t || t.status !== "voting") return t
+  if (!t.vote_deadline || new Date(t.vote_deadline).getTime() > Date.now())
+    return t
+  const cands = candidateDays(t)
+  const final = (cands[0] && cands[0].date) || t.date_from || t.preferred_date
+  run(
+    "UPDATE group_trips SET status='confirmed', final_date=?, confirmed_at=? WHERE id=?",
+    final,
+    nowISO(),
+    t.id,
+  )
+  return get("SELECT * FROM group_trips WHERE id=?", t.id)
 }
 
 // Current per-person price given how many seats are filled. Vehicle-based:
@@ -207,23 +303,43 @@ export const routes = [
     },
   },
 
-  // --- Public trip detail + members ---
+  // --- My membership on a trip (available days + my vote) --- before /:id ---
+  {
+    method: "GET",
+    path: "/api/group-trips/:id/me",
+    auth: true,
+    handler: ({ user, params }) => {
+      ensureGt()
+      const m = get(
+        "SELECT * FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
+        params.id,
+        user.id,
+      )
+      return {
+        member: m ? { ...m, available_days: parseDays(m.available_days) } : null,
+      }
+    },
+  },
+
+  // --- Public trip detail + members + ranked candidate days ---
   {
     method: "GET",
     path: "/api/group-trips/:id",
     handler: ({ params }) => {
       ensureGt()
-      const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
+      let t = get("SELECT * FROM group_trips WHERE id=?", params.id)
       if (!t) err(404, "trip not found")
+      t = maybeFinalize(t)
       const members = all(
         "SELECT id,name,seats,status,joined_at FROM group_members WHERE trip_id=? AND status IN ('reserved','paid') ORDER BY joined_at ASC",
         t.id,
       )
-      return { trip: tripView(t), members }
+      return { trip: tripView(t), members, candidate_days: candidateDays(t) }
     },
   },
 
   // --- Tourist creates a trip request (awaits admin quote) ---
+  // Creator provides an available date RANGE (date_from -> date_to).
   {
     method: "POST",
     path: "/api/group-trips/request",
@@ -234,12 +350,18 @@ export const routes = [
       const itinerary = String(body.itinerary_text || "").trim()
       if (!itinerary) err(400, "itinerary_text is required")
       const title = String(body.title || "").trim() || "رحلة مخصّصة"
+      const date_from = body.date_from || null
+      const date_to = body.date_to || null
+      if (date_from && date_to && date_from > date_to)
+        err(400, "date_to must be on or after date_from")
       const info = run(
-        "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,min_people,max_people,small_size,share_code,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,date_from,date_to,min_people,max_people,small_size,share_code,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         user.id,
         title,
         itinerary,
-        body.preferred_date || null,
+        date_from, // preferred_date mirrors the range start for back-compat
+        date_from,
+        date_to,
         s.min_people,
         s.max_people,
         s.small_size,
@@ -255,11 +377,12 @@ export const routes = [
   },
 
   // --- Creator accepts the admin quote -> trip goes open for everyone ---
+  // The creator is auto-added as the first member, available across the range.
   {
     method: "POST",
     path: "/api/group-trips/:id/accept",
     auth: true,
-    handler: ({ user, params }) => {
+    handler: ({ user, params, body }) => {
       ensureGt()
       const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
       if (!t) err(404, "trip not found")
@@ -275,11 +398,33 @@ export const routes = [
         deadline,
         t.id,
       )
+      // Auto-enroll the creator as the first traveller (full availability).
+      const existing = get(
+        "SELECT * FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
+        t.id,
+        user.id,
+      )
+      if (!existing) {
+        const pp = perPerson(t, 1)
+        run(
+          "INSERT INTO group_members (trip_id,user_id,name,phone,seats,amount,status,available_days,referral_code,joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+          t.id,
+          user.id,
+          user.name || null,
+          body.phone || user.phone || null,
+          1,
+          pp != null ? round2(pp) : 0,
+          "reserved",
+          JSON.stringify(daysInRange(t.date_from, t.date_to)),
+          null,
+          nowISO(),
+        )
+      }
       return get("SELECT * FROM group_trips WHERE id=?", t.id)
     },
   },
 
-  // --- Anyone (logged-in) joins an open trip ---
+  // --- Anyone (logged-in) joins an open trip, picking their available days ---
   {
     method: "POST",
     path: "/api/group-trips/:id/join",
@@ -299,31 +444,70 @@ export const routes = [
         user.id,
       )
       if (existing) err(400, "you already joined this trip")
+      // Validate the picked days fall inside the creator's range.
+      const range = daysInRange(t.date_from, t.date_to)
+      let avail = parseDays(body.available_days)
+      if (range.length) {
+        avail = avail.filter((d) => range.indexOf(d) >= 0)
+        if (!avail.length)
+          err(400, "pick at least one available day within the trip range")
+      }
       const pp = perPerson(t, count + seats)
       const amount = pp != null ? round2(pp * seats) : 0
       run(
-        "INSERT INTO group_members (trip_id,user_id,name,seats,amount,status,referral_code,joined_at) VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO group_members (trip_id,user_id,name,phone,seats,amount,status,available_days,referral_code,joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         t.id,
         user.id,
         body.name || user.name || null,
+        body.phone || user.phone || null,
         seats,
         amount,
         "reserved",
+        JSON.stringify(avail),
         body.referral_code || null,
         nowISO(),
       )
-      // Auto-confirm when the minimum is reached.
+      // When the minimum is reached, open voting on the final day.
       const newCount = seatsCount(t.id)
-      if (t.min_people && newCount >= t.min_people && t.status === "open")
+      if (t.min_people && newCount >= t.min_people && t.status === "open") {
+        const voteHours = Number(setting("gt_vote_hours", "48")) || 48
+        const vd = new Date(Date.now() + voteHours * 3600000).toISOString()
         run(
-          "UPDATE group_trips SET status='confirmed', confirmed_at=? WHERE id=?",
-          nowISO(),
+          "UPDATE group_trips SET status='voting', vote_deadline=? WHERE id=?",
+          vd,
           t.id,
         )
+      }
       return {
         ok: true,
         trip: tripView(get("SELECT * FROM group_trips WHERE id=?", t.id)),
       }
+    },
+  },
+
+  // --- Member casts / changes their vote for the final day ---
+  {
+    method: "POST",
+    path: "/api/group-trips/:id/vote",
+    auth: true,
+    handler: ({ user, params, body }) => {
+      ensureGt()
+      const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
+      if (!t) err(404, "trip not found")
+      if (t.status !== "voting") err(400, "voting is not open for this trip")
+      const m = get(
+        "SELECT * FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
+        t.id,
+        user.id,
+      )
+      if (!m) err(403, "join the trip before voting")
+      const day = String(body.date || body.vote_date || "")
+      if (!day) err(400, "date is required")
+      const avail = parseDays(m.available_days)
+      if (avail.length && avail.indexOf(day) < 0)
+        err(400, "you can only vote for a day you marked as available")
+      run("UPDATE group_members SET vote_date=? WHERE id=?", day, m.id)
+      return { ok: true, candidate_days: candidateDays(t) }
     },
   },
 
@@ -343,9 +527,9 @@ export const routes = [
       )
       if (!m) err(404, "you are not a member of this trip")
       const s = gtSettings()
-      if (t.preferred_date) {
-        const cutoff =
-          new Date(t.preferred_date).getTime() - s.refund_hours * 3600000
+      const refDate = t.final_date || t.preferred_date || t.date_from
+      if (refDate) {
+        const cutoff = new Date(refDate).getTime() - s.refund_hours * 3600000
         if (Date.now() > cutoff)
           err(400, "refund window has passed (" + s.refund_hours + "h before trip)")
       }
@@ -369,6 +553,7 @@ export const routes = [
         gt_small_size: "small_size",
         gt_deadline_days: "deadline_days",
         gt_refund_hours: "refund_hours",
+        gt_vote_hours: "vote_hours",
       }
       for (const [key, field] of Object.entries(num))
         if (body[field] !== undefined && body[field] !== null)
@@ -432,7 +617,7 @@ export const routes = [
     },
   },
 
-  // --- Admin changes trip status (open/confirmed/completed/cancelled/expired) ---
+  // --- Admin changes trip status (open/voting/confirmed/completed/...) ---
   {
     method: "POST",
     path: "/api/admin/group-trips/:id/status",
@@ -446,6 +631,7 @@ export const routes = [
         "pending",
         "quoted",
         "open",
+        "voting",
         "confirmed",
         "completed",
         "cancelled",
@@ -464,7 +650,30 @@ export const routes = [
     },
   },
 
-  // --- Admin lists members of a trip ---
+  // --- Admin force-finalizes the winning day (skips waiting for the deadline) ---
+  {
+    method: "POST",
+    path: "/api/admin/group-trips/:id/finalize",
+    auth: ["admin"],
+    handler: ({ params, body }) => {
+      ensureGt()
+      const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
+      if (!t) err(404, "trip not found")
+      const cands = candidateDays(t)
+      const final =
+        body.final_date || (cands[0] && cands[0].date) || t.date_from
+      if (!final) err(400, "no candidate day available to finalize")
+      run(
+        "UPDATE group_trips SET status='confirmed', final_date=?, confirmed_at=? WHERE id=?",
+        final,
+        nowISO(),
+        t.id,
+      )
+      return get("SELECT * FROM group_trips WHERE id=?", t.id)
+    },
+  },
+
+  // --- Admin lists members of a trip (full rows incl. phone + days) ---
   {
     method: "GET",
     path: "/api/admin/group-trips/:id/members",
@@ -508,7 +717,7 @@ export const routes = [
 
   // =================== TEMP DEMO SHOWCASE (remove at go-live) ===============
 
-  // --- Seed 10 ready-made OPEN trips so the public strip has content ---
+  // --- Seed 10 ready-made trips (8 open + 2 in voting), each with a range ---
   // Safe to re-run: it wipes previous demo rows first. All rows are tagged
   // admin_note='__DEMO__' and removed by /clear-demo below.
   {
@@ -517,7 +726,6 @@ export const routes = [
     auth: ["admin"],
     handler: ({ user }) => {
       ensureGt()
-      // wipe any previous demo rows first (idempotent)
       for (const o of all(
         "SELECT id FROM group_trips WHERE admin_note=?",
         "__DEMO__",
@@ -526,18 +734,30 @@ export const routes = [
         run("DELETE FROM group_trips WHERE id=?", o.id)
       }
       const now = Date.now()
+      const voteHours = Number(setting("gt_vote_hours", "48")) || 48
       let created = 0
       DEMO_TRIPS.forEach((d, idx) => {
-        const deadline = new Date(now + d.days * 86400000).toISOString()
-        const preferred = new Date(now + (d.days + 5) * 86400000)
+        const dateFrom = new Date(now + d.days * 86400000)
           .toISOString()
           .slice(0, 10)
+        const dateTo = new Date(now + (d.days + 6) * 86400000)
+          .toISOString()
+          .slice(0, 10)
+        const deadline = new Date(now + d.days * 86400000).toISOString()
+        const range = daysInRange(dateFrom, dateTo)
+        const isVoting = !!d.voting
+        const status = isVoting ? "voting" : "open"
+        const voteDeadline = isVoting
+          ? new Date(now + voteHours * 3600000).toISOString()
+          : null
         const info = run(
-          "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,min_people,max_people,small_size,group_size,price_small,price_group,vehicle_small,vehicle_group,deadline,share_code,admin_note,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,date_from,date_to,min_people,max_people,small_size,group_size,price_small,price_group,vehicle_small,vehicle_group,deadline,vote_deadline,share_code,admin_note,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
           user.id,
           d.title,
           "Places: " + d.places + "\n\n" + d.plan,
-          preferred,
+          dateFrom,
+          dateFrom,
+          dateTo,
           10,
           14,
           2,
@@ -547,22 +767,34 @@ export const routes = [
           "ملاكي",
           "باص",
           deadline,
+          voteDeadline,
           "DEMO-" + (1001 + idx),
           "__DEMO__",
-          "open",
+          status,
           nowISO(),
         )
         const tripId = Number(info.lastInsertRowid)
         const amount = round2(d.price_group / 10)
-        for (let i = 0; i < d.joined; i++) {
+        const memberCount = isVoting ? Math.max(d.joined, 11) : d.joined
+        for (let i = 0; i < memberCount; i++) {
+          const av = []
+          for (let k = 0; k < 3; k++) {
+            const day = range[(i + k * 2) % range.length]
+            if (day && av.indexOf(day) < 0) av.push(day)
+          }
+          let voteDate = null
+          if (isVoting && i % 4 !== 0) voteDate = av[0] || null
           run(
-            "INSERT INTO group_members (trip_id,user_id,name,seats,amount,status,joined_at) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO group_members (trip_id,user_id,name,phone,seats,amount,status,available_days,vote_date,joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
             tripId,
             null,
             DEMO_NAMES[(idx + i) % DEMO_NAMES.length],
+            "2010" + String(1000000 + idx * 100 + i),
             1,
             amount,
             "reserved",
+            JSON.stringify(av),
+            voteDate,
             nowISO(),
           )
         }
