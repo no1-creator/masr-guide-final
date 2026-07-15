@@ -285,7 +285,17 @@
     ].join(';');
     track.style.setProperty('scrollbar-width', 'none');
     var st = document.createElement('style');
-    st.textContent = '#' + CONTAINER_ID + ' .rago-track::-webkit-scrollbar{display:none}';
+    var idSel = '#' + CONTAINER_ID;
+    st.textContent =
+      idSel + ' .rago-track::-webkit-scrollbar{display:none}' +
+      // Mobile-only tweaks. Uses !important so it overrides the desktop inline
+      // styles ONLY on small screens; desktop stays exactly as-is.
+      '@media (max-width:640px){' +
+        idSel + '{margin-top:-24px !important;padding-left:14px !important;padding-right:14px !important;}' +
+        idSel + ' .rago-track{gap:10px !important;padding:8px 2px 12px !important;}' +
+        idSel + ' .rago-track>div{width:44vw !important;min-width:150px !important;max-width:220px !important;}' +
+        idSel + ' > div > button{display:none !important;}' +
+      '}';
     wrap.appendChild(st);
 
     TRIPS.concat(TRIPS).forEach(function (t) { track.appendChild(buildCard(t)); }); // doubled -> seamless loop
