@@ -48,11 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
               titleSpacing: 16,
               title: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset('assets/icon/rago.png', height: 30, width: 30, fit: BoxFit.cover),
-                  ),
-                  const SizedBox(width: 8),
                   RichText(
                     text: const TextSpan(
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 0.2),
