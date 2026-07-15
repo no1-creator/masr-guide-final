@@ -479,6 +479,125 @@ async function saveBanner(){const id=document.getElementById('bn-id').value;cons
 function copyLink(){const el=document.getElementById('aff-link');el.select();navigator.clipboard.writeText(el.value).then(()=>toast('Copied'));}
 function qrSvg(text){let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCodeAt(i))>>>0;const n=21,cell=8;let rects='';for(let y=0;y<n;y++)for(let x=0;x<n;x++){const fin=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);const on=fin?((x===0||x===6||y===0||y===6||(x>=2&&x<=4&&y>=2&&y<=4))):(((h>>((x*3+y*5)%31))&1)&&((x+y)%2===0||((h>>(x%13))&1)));if(on)rects+=`<rect x="${x*cell}" y="${y*cell}" width="${cell}" height="${cell}"/>`;}return `<svg class="qr" width="${n*cell}" height="${n*cell}" viewBox="0 0 ${n*cell} ${n*cell}" fill="#111">${rects}</svg>`;}
 
+  /* ===================== Group Trips — admin dashboard ===================== */
+/* Adds a "Group Trips" section to the Admin dashboard. Self-contained: it only
+   augments the existing NAV / NAVICON / SEC objects, so nothing else changes. */
+(function(){
+  // 1) Add the menu item (before "Settings") + its icon.
+  if(NAV.admin.indexOf('grouptrips')<0){
+    var at=NAV.admin.indexOf('settings'); if(at<0) at=NAV.admin.length;
+    NAV.admin.splice(at,0,'grouptrips');
+  }
+  NAVICON.grouptrips='users';
+
+  // 2) Show a friendly "Group Trips" label (renderNav auto-capitalises keys).
+  var _renderNav=renderNav;
+  renderNav=function(){
+    _renderNav();
+    document.querySelectorAll('#dnav button').forEach(function(b){
+      if(b.textContent.trim()==='Grouptrips'){
+        b.childNodes.forEach(function(n){
+          if(n.nodeType===3 && n.textContent.indexOf('Grouptrips')>=0)
+            n.textContent=n.textContent.replace('Grouptrips','Group Trips');
+        });
+      }
+    });
+  };
+
+  // 3) The panel itself.
+  SEC['admin:grouptrips']=async function(m){
+    var d=await api('/api/admin/group-trips');
+    var trips=d.trips||[];
+    var cnt=function(k){return trips.filter(function(t){return t.status===k;}).length;};
+    m.innerHTML=
+      '<div class="stats">'
+      +'<div class="stat"><div class="n">'+trips.length+'</div><div class="l">Total trips</div></div>'
+      +'<div class="stat"><div class="n">'+cnt('pending')+'</div><div class="l">Awaiting quote</div></div>'
+      +'<div class="stat"><div class="n">'+(cnt('open')+cnt('voting'))+'</div><div class="l">Live (open / voting)</div></div>'
+      +'<div class="stat"><div class="n">'+cnt('confirmed')+'</div><div class="l">Confirmed</div></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">'
+      +'<h3 style="margin:0;flex:1">Group trips ('+trips.length+')</h3>'
+      +'<button class="btn sm" onclick="gtNew()">+ New trip</button>'
+      +'<button class="btn ghost sm" onclick="gtSettingsModal()">Settings</button>'
+      +'<button class="btn ghost sm" onclick="gtSeedDemo()">Seed demo</button>'
+      +'<button class="btn danger sm" onclick="gtClearDemo()">Clear demo</button>'
+      +'</div>'
+      +tbl(['#','Title','Status','Dates','Members','Per person','Prices S / G','Actions'],
+        trips.map(function(t){
+          return [
+            t.id,
+            esc(t.title||'—')+(t.admin_note==='__DEMO__'?' <span class="tag">demo</span>':''),
+            statusTag(t.status),
+            (t.date_from||t.preferred_date||'—')+(t.date_to?(' → '+t.date_to):'')+(t.final_date?('<br><b>Final: '+t.final_date+'</b>'):''),
+            (t.members_count||0)+(t.min_people?(' / '+t.min_people):''),
+            t.current_per_person!=null?money(t.current_per_person):'—',
+            (t.price_small!=null?money(t.price_small):'—')+' / '+(t.price_group!=null?money(t.price_group):'—'),
+            gtActions(t)
+          ];
+        }));
+  };
+})();
+
+function gtActions(t){
+  var b=['<button class="btn ghost sm" onclick="gtMembers('+t.id+')">Members</button>'];
+  if(t.status==='pending'||t.status==='quoted') b.push('<button class="btn sm" onclick="gtQuote('+t.id+')">Quote</button>');
+  if(t.status==='open'||t.status==='voting') b.push('<button class="btn sm" onclick="gtFinalize('+t.id+')">Finalize</button>');
+  b.push('<button class="btn ghost sm" onclick="gtStatus('+t.id+')">Status</button>');
+  return b.join(' ');
+}
+async function gtNew(){
+  var title=prompt('Trip title:'); if(title===null) return;
+  var itn=prompt('Itinerary (places & plan):'); if(itn===null) return;
+  var from=prompt('Available FROM (YYYY-MM-DD):')||null;
+  var to=prompt('Available TO (YYYY-MM-DD):')||null;
+  try{await api('/api/group-trips/request',{method:'POST',body:{title:title,itinerary_text:itn||title,date_from:from,date_to:to}});toast('Trip created — now set a quote');loadSec();}catch(e){toast(e.message);}
+}
+async function gtQuote(id){
+  var ps=Number(prompt('Private-car (ملاكي) TOTAL price in $:')); if(!ps) return;
+  var pg=Number(prompt('Bus/group (باص) TOTAL price in $:')); if(!pg) return;
+  try{await api('/api/admin/group-trips/'+id+'/quote',{method:'POST',body:{price_small:ps,price_group:pg}});toast('Quoted');loadSec();}catch(e){toast(e.message);}
+}
+async function gtStatus(id){
+  var st=prompt('New status: pending, quoted, open, voting, confirmed, completed, cancelled, expired'); if(!st) return;
+  try{await api('/api/admin/group-trips/'+id+'/status',{method:'POST',body:{status:st.trim()}});toast('Status → '+st.trim());loadSec();}catch(e){toast(e.message);}
+}
+async function gtFinalize(id){
+  var d=prompt('Final trip date (YYYY-MM-DD) — leave blank to auto-pick the top-voted day:'); if(d===null) return;
+  try{var r=await api('/api/admin/group-trips/'+id+'/finalize',{method:'POST',body:{final_date:d||undefined}});toast('Confirmed for '+(r.final_date||''));loadSec();}catch(e){toast(e.message);}
+}
+var GT_MTRIP=null;
+async function gtMembers(id){
+  GT_MTRIP=id;
+  try{
+    var r=await api('/api/admin/group-trips/'+id+'/members');var list=r.members||[];
+    var m=document.getElementById('dmain');
+    m.innerHTML='<button class="btn ghost sm" onclick="navTo(\'grouptrips\')">← Back to trips</button>'
+      +'<h3 style="margin:14px 0">Members of trip #'+id+' ('+list.length+')</h3>'
+      +tbl(['#','Name','Phone','Seats','Amount','Status','Voted day','Action'],
+        list.map(function(x){
+          return [x.id,esc(x.name||'—'),esc(x.phone||'—'),x.seats,money(x.amount),statusTag(x.status),x.vote_date||'—',
+            '<button class="btn sm" onclick="gtPay('+x.id+')">Mark paid</button> <button class="btn ghost sm" onclick="gtRefund('+x.id+')">Refund</button>'];
+        }));
+  }catch(e){toast(e.message);}
+}
+async function gtPay(id){try{await api('/api/admin/group-members/'+id+'/pay',{method:'POST',body:{status:'paid'}});toast('Marked paid');if(GT_MTRIP)gtMembers(GT_MTRIP);}catch(e){toast(e.message);}}
+async function gtRefund(id){if(!confirm('Refund this member?'))return;try{await api('/api/admin/group-members/'+id+'/pay',{method:'POST',body:{status:'refunded'}});toast('Refunded');if(GT_MTRIP)gtMembers(GT_MTRIP);}catch(e){toast(e.message);}}
+async function gtSeedDemo(){if(!confirm('Add 10 demo group trips? (safe — you can remove them anytime)'))return;try{var r=await api('/api/admin/group-trips/seed-demo',{method:'POST'});toast('Added '+r.created+' demo trips');loadSec();}catch(e){toast(e.message);}}
+async function gtClearDemo(){if(!confirm('Remove ALL demo group trips?'))return;try{var r=await api('/api/admin/group-trips/clear-demo',{method:'POST'});toast('Removed '+r.removed+' demo trips');loadSec();}catch(e){toast(e.message);}}
+async function gtSettingsModal(){
+  try{
+    var s=await api('/api/group-trips/settings');
+    var min=prompt('Minimum people to confirm a trip:',s.min_people); if(min===null) return;
+    var max=prompt('Maximum people:',s.max_people); if(max===null) return;
+    var dl=prompt('Join deadline (days):',s.deadline_days); if(dl===null) return;
+    var vh=prompt('Voting window (hours):',s.vote_hours); if(vh===null) return;
+    var rh=prompt('Refund window (hours before trip):',s.refund_hours); if(rh===null) return;
+    await api('/api/admin/group-trips/settings',{method:'POST',body:{min_people:Number(min),max_people:Number(max),deadline_days:Number(dl),vote_hours:Number(vh),refund_hours:Number(rh)}});
+    toast('Group-trip settings saved');
+  }catch(e){toast(e.message);}
+}
+/* =================== end Group Trips — admin dashboard =================== */
 renderAuth();loadSlider();loadSlider2();loadCats();loadServices();
 </script>
 <script src="group-trips.js"></script>
