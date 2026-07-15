@@ -1,8 +1,9 @@
 /* RaGo — Open Trips strip (frontend-only demo)
- * Simple & reliable: a horizontal strip of trip cards that MOVES left/right
- * (continuous auto-scroll + always-visible desktop arrows). English UI, USD.
- * Also hides the OLD group-trips.js Arabic row (its banner stays untouched).
- * No layout hacks — sits cleanly just under the "Create your journey" banner.
+ * Goal: reliable placement + horizontal scrolling (desktop arrows + auto-scroll).
+ * Strategy: the site's own group-trips.js already renders a correctly-positioned
+ * row (#gt-open-row, right under the "Create your journey" banner). We insert OUR
+ * strip in that EXACT spot and hide the old row, so it can never drift to the
+ * bottom of the page. English UI, USD.
  */
 (function () {
   'use strict';
@@ -38,51 +39,9 @@
 
   function usd(n) { return '$' + Number(n).toLocaleString('en-US'); }
 
-  // ---- Banner detection -------------------------------------------------
-  function isDark(bg) {
-    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(bg || '');
-    if (!m) return false;
-    var a = m[4] === undefined ? 1 : parseFloat(m[4]);
-    if (a < 0.3) return false;
-    return (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) < 110;
-  }
-  function bannerish(el) {
-    var cs = getComputedStyle(el);
-    return isDark(cs.backgroundColor) || /gradient/i.test(cs.backgroundImage || '');
-  }
-  function findBanner() {
-    var nodes = document.querySelectorAll('h1,h2,h3,h4,p,span,button,a');
-    var start = null;
-    for (var i = 0; i < nodes.length; i++) {
-      var t = (nodes[i].textContent || '').trim();
-      if (!t || t.length > 120) continue;
-      if (/design your own trip/i.test(t) || /create your journey/i.test(t)) {
-        if (!start || t.length < (start.textContent || '').trim().length) start = nodes[i];
-      }
-    }
-    if (!start) return null;
-    var el = start;
-    for (var up = 0; up < 8 && el && el.parentElement; up++) {
-      el = el.parentElement;
-      var r = el.getBoundingClientRect();
-      if (bannerish(el) && r.height > 90 && r.width > 300) return el;
-    }
-    el = start;
-    for (var u2 = 0; u2 < 8 && el && el.parentElement; u2++) {
-      el = el.parentElement;
-      var r2 = el.getBoundingClientRect();
-      if (r2.height > 90 && r2.width > 300) return el;
-    }
-    return start.parentElement;
-  }
-
-  // ---- Hide the OLD group-trips.js Arabic row (its banner stays) --------
-  function hideOld() {
-    var sel = ['.gt-open-row', '#gt-open-row', '.gt-strip'];
-    for (var i = 0; i < sel.length; i++) {
-      var els = document.querySelectorAll(sel[i]);
-      for (var j = 0; j < els.length; j++) { els[j].style.display = 'none'; }
-    }
+  // ---- Locate the site's own open-trips row (perfectly positioned) -------
+  function findAnchor() {
+    return document.querySelector('#gt-open-row') || document.querySelector('.gt-open-row');
   }
 
   // ---- Details modal ----------------------------------------------------
@@ -231,11 +190,11 @@
     card.style.cssText = [
       'flex:0 0 auto', 'width:168px',
       'background:#ffffff', 'border:1px solid #E7EDF0', 'border-radius:14px', 'overflow:hidden',
-      'box-shadow:0 10px 24px rgba(9,25,33,.16)', 'font-family:inherit', 'cursor:pointer',
+      'box-shadow:0 10px 24px rgba(9,25,33,.18)', 'font-family:inherit', 'cursor:pointer',
       'transition:transform .15s ease, box-shadow .15s ease'
     ].join(';');
-    card.onmouseenter = function () { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 14px 30px rgba(9,25,33,.24)'; };
-    card.onmouseleave = function () { card.style.transform = 'none'; card.style.boxShadow = '0 10px 24px rgba(9,25,33,.16)'; };
+    card.onmouseenter = function () { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 14px 30px rgba(9,25,33,.26)'; };
+    card.onmouseleave = function () { card.style.transform = 'none'; card.style.boxShadow = '0 10px 24px rgba(9,25,33,.18)'; };
     card.onclick = function () { openModal(t); };
 
     var media = document.createElement('div');
@@ -278,31 +237,26 @@
     return card;
   }
 
-  // ---- Mount ------------------------------------------------------------
-  function mount(banner) {
-    var old = document.getElementById(CONTAINER_ID);
-    if (old) old.parentNode.removeChild(old);
+  // ---- Mount at the site's own row position ------------------------------
+  function mount() {
+    if (document.getElementById(CONTAINER_ID)) return true;
+    var anchor = findAnchor();
+    if (!anchor || !anchor.parentNode) return false;
 
-    var parent = banner.parentElement;
-    if (!parent) return;
-    var cs = getComputedStyle(banner);
+    var cs = getComputedStyle(anchor);
 
     var wrap = document.createElement('div');
     wrap.id = CONTAINER_ID;
     wrap.style.boxSizing = 'border-box';
     wrap.style.position = 'relative';
-    wrap.style.zIndex = '5';
+    wrap.style.zIndex = '3';
+    // Inherit the exact horizontal + vertical placement of the site's own row.
+    wrap.style.marginTop = cs.marginTop;
     wrap.style.marginLeft = cs.marginLeft;
     wrap.style.marginRight = cs.marginRight;
-    wrap.style.marginTop = '-18px'; // tuck slightly toward the banner (safe, no overlap)
-    if (cs.maxWidth && cs.maxWidth !== 'none') wrap.style.maxWidth = cs.maxWidth;
     wrap.style.paddingLeft = cs.paddingLeft;
     wrap.style.paddingRight = cs.paddingRight;
-
-    var head = document.createElement('div');
-    head.textContent = 'OPEN TRIPS';
-    head.style.cssText = 'font-size:12px;font-weight:800;letter-spacing:.08em;color:#123B4C;margin:0 0 8px';
-    wrap.appendChild(head);
+    if (cs.maxWidth && cs.maxWidth !== 'none') wrap.style.maxWidth = cs.maxWidth;
 
     var viewport = document.createElement('div');
     viewport.style.cssText = 'position:relative;overflow:hidden';
@@ -310,14 +264,14 @@
     var track = document.createElement('div');
     track.className = 'rago-track';
     track.style.cssText = [
-      'display:flex', 'gap:14px', 'overflow-x:auto', 'padding:6px 2px 14px', '-webkit-overflow-scrolling:touch'
+      'display:flex', 'gap:14px', 'overflow-x:auto', 'padding:10px 2px 14px', '-webkit-overflow-scrolling:touch'
     ].join(';');
     track.style.setProperty('scrollbar-width', 'none');
     var st = document.createElement('style');
     st.textContent = '#' + CONTAINER_ID + ' .rago-track::-webkit-scrollbar{display:none}';
     wrap.appendChild(st);
 
-    TRIPS.concat(TRIPS).forEach(function (t) { track.appendChild(buildCard(t)); }); // doubled for seamless loop
+    TRIPS.concat(TRIPS).forEach(function (t) { track.appendChild(buildCard(t)); }); // doubled -> seamless loop
     viewport.appendChild(track);
 
     var paused = { v: false };
@@ -327,8 +281,8 @@
       b.setAttribute('aria-label', dir < 0 ? 'Previous trips' : 'Next trips');
       b.innerHTML = dir < 0 ? '&#8249;' : '&#8250;';
       b.style.cssText = [
-        'position:absolute', 'top:calc(50% + 4px)', 'transform:translateY(-50%)',
-        (dir < 0 ? 'left:2px' : 'right:2px'), 'z-index:6',
+        'position:absolute', 'top:50%', 'transform:translateY(-50%)',
+        (dir < 0 ? 'left:0' : 'right:0'), 'z-index:6',
         'width:40px', 'height:40px', 'border-radius:999px', 'border:0',
         'background:#123B4C', 'color:#fff', 'font-size:24px', 'line-height:1', 'cursor:pointer',
         'display:flex', 'align-items:center', 'justify-content:center',
@@ -341,7 +295,7 @@
         var hw = track.scrollWidth / 2;
         if (dir < 0 && track.scrollLeft < 340) track.scrollLeft += hw;
         track.scrollBy({ left: dir * 340, behavior: 'smooth' });
-        setTimeout(function () { paused.v = false; }, 1200);
+        setTimeout(function () { paused.v = false; }, 1400);
       };
       return b;
     }
@@ -351,41 +305,34 @@
     viewport.addEventListener('mouseleave', function () { paused.v = false; });
 
     wrap.appendChild(viewport);
-    parent.insertBefore(wrap, banner.nextSibling);
 
-    // Continuous auto-scroll with seamless wrap.
+    // Drop OUR strip exactly where the site's row sits, then hide the old one.
+    anchor.parentNode.insertBefore(wrap, anchor);
+    anchor.style.display = 'none';
+
+    // Continuous auto-scroll with a seamless wrap.
     function tick() {
       if (!document.getElementById(CONTAINER_ID)) return;
       var hw = track.scrollWidth / 2;
       if (!paused.v && hw > 0) {
-        track.scrollLeft += 0.5;
+        track.scrollLeft += 0.6;
         if (track.scrollLeft >= hw) track.scrollLeft -= hw;
       }
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
+    return true;
   }
 
-  // ---- Init -------------------------------------------------------------
-  function init() {
-    hideOld();
-    var banner = findBanner();
-    if (banner) { mount(banner); hideOld(); return true; }
-    return false;
-  }
+  // ---- Boot -------------------------------------------------------------
   function boot() {
-    var ht = 0;
-    var hv = setInterval(function () { hideOld(); if (++ht > 40) clearInterval(hv); }, 300);
-    if (init()) return;
+    if (mount()) return;
     var tries = 0;
-    var iv = setInterval(function () { tries++; if (init() || tries > 60) clearInterval(iv); }, 250);
+    var iv = setInterval(function () { tries++; if (mount() || tries > 80) clearInterval(iv); }, 250);
     if (window.MutationObserver) {
-      var mo = new MutationObserver(function () {
-        if (document.getElementById(CONTAINER_ID)) { mo.disconnect(); return; }
-        if (init()) mo.disconnect();
-      });
+      var mo = new MutationObserver(function () { if (mount()) mo.disconnect(); });
       mo.observe(document.body, { childList: true, subtree: true });
-      setTimeout(function () { mo.disconnect(); }, 20000);
+      setTimeout(function () { mo.disconnect(); }, 25000);
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
