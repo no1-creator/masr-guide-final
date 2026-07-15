@@ -96,7 +96,7 @@ export const routes = [
 				"INSERT INTO services (vendor_id,category_id,title,location,description,price,currency,duration,rating,reviews_count,featured,cancel_policy,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 				vendor.id, cat ? cat.id : null, body.title || "Untitled",
 				body.location || null, body.description || null, Number(body.price) || 0,
-				body.currency || "EGP", body.duration || null, 0, 0,
+body.currency || "USD", body.duration || null, 0, 0,
 				body.featured ? 1 : 0, body.cancel_policy || null, body.status || "active",
 				new Date().toISOString(),
 			)
