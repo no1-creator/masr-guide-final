@@ -34,15 +34,23 @@
     return lum < 110;
   }
 
-  // Find the dark "Create your journey" banner container.
+  // A banner-like element has a dark solid bg OR a CSS gradient background.
+  function bannerish(el) {
+    var cs = getComputedStyle(el);
+    return isDark(cs.backgroundColor) || /gradient/i.test(cs.backgroundImage || '');
+  }
+
+  // Find the "Create your journey" banner container. We pick the SMALLEST
+  // element that carries the banner text (a heading/button), never a big
+  // page wrapper, then climb up to the banner box (its bg is a gradient).
   function findBanner() {
-    var heads = document.querySelectorAll('h1,h2,h3,p,span,div');
+    var nodes = document.querySelectorAll('h1,h2,h3,h4,p,span,button,a');
     var start = null;
-    for (var i = 0; i < heads.length; i++) {
-      var t = (heads[i].textContent || '').trim();
-      if (/create your journey/i.test(t) || /design your own trip/i.test(t)) {
-        start = heads[i];
-        break;
+    for (var i = 0; i < nodes.length; i++) {
+      var t = (nodes[i].textContent || '').trim();
+      if (!t || t.length > 120) continue; // skip large wrapper containers
+      if (/design your own trip/i.test(t) || /create your journey/i.test(t)) {
+        if (!start || t.length < (start.textContent || '').trim().length) start = nodes[i];
       }
     }
     if (!start) return null;
@@ -50,9 +58,14 @@
     for (var up = 0; up < 8 && el && el.parentElement; up++) {
       el = el.parentElement;
       var r = el.getBoundingClientRect();
-      if (isDark(getComputedStyle(el).backgroundColor) && r.height > 90 && r.width > 300) {
-        return el;
-      }
+      if (bannerish(el) && r.height > 90 && r.width > 300) return el;
+    }
+    // Fallback: nearest block-level ancestor with banner-like size.
+    el = start;
+    for (var u2 = 0; u2 < 8 && el && el.parentElement; u2++) {
+      el = el.parentElement;
+      var r2 = el.getBoundingClientRect();
+      if (r2.height > 90 && r2.width > 300) return el;
     }
     return start.parentElement;
   }
