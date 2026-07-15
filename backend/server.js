@@ -16,6 +16,7 @@ import { routes as walletRoutes } from "./src/routes/wallets.js"
 import { routes as bannerRoutes } from "./src/routes/banners.js"
 import { routes as reviewRoutes } from "./src/routes/reviews.js"
 import { routes as adminRoutes } from "./src/routes/admin.js"
+import { routes as groupTripRoutes } from "./src/routes/groupTrips.js"
 
 migrate()
 
@@ -35,6 +36,12 @@ run(
   }),
 )
 
+// Prices are shown in US Dollars ($) across the website and app. This
+// idempotent migration relabels any legacy EGP rows to USD on the live DB.
+// It only changes the currency label — it never touches the numeric price.
+run("UPDATE services SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
+run("UPDATE bookings SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
+
 if (get("SELECT COUNT(*) c FROM users").c === 0) {
   console.log("empty database — seeding demo data...")
   seed()
@@ -50,6 +57,7 @@ const ROUTES = [
   ...bannerRoutes,
   ...reviewRoutes,
   ...adminRoutes,
+  ...groupTripRoutes,
 ].map((r) => ({ ...r, seg: r.path.split("/").filter(Boolean) }))
 
 function matchRoute(method, pathname) {
