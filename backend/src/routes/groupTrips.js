@@ -2,15 +2,8 @@
 // Phase A (booking/confirm): money is recorded manually by admin from the
 // dashboard. Wiring a real payment gateway later needs no schema change.
 //
-// Date flow: the creator sets an AVAILABLE DATE RANGE (date_from..date_to).
-// Each joiner picks the specific days that work for them from that range.
-// When the minimum group size is reached the trip enters 'voting': members
-// vote for a final date among the days they are available on. After the
-// voting window passes, the highest-voted day is auto-selected as final_date
-// and the trip is confirmed — then payment is arranged.
-//
 // This module is self-contained: it creates its own tables + default settings
-// lazily (idempotent) and also migrates missing columns on a live DB.
+// lazily (idempotent) so it works no matter the import order in server.js.
 import { get, all, run, setting } from "../db.js"
 import { err, nowISO, round2 } from "../util.js"
 
@@ -19,16 +12,33 @@ import { err, nowISO, round2 } from "../util.js"
 // ---------------------------------------------------------------------------
 const DEFAULT_TIERS = [
   { name: "ملاكي", min: 1, max: 3 },
-  { name: "هاي-إيص", min: 4, max: 7 },
+  { name: "هاي-إيس", min: 4, max: 7 },
   { name: "باص", min: 8, max: 14 },
 ]
 
+// ---------------------------------------------------------------------------
+// DEMO showcase data (temporary). Seed via POST /api/admin/group-trips/seed-demo
+// and remove any time via POST /api/admin/group-trips/clear-demo. All demo rows
+// are tagged admin_note='__DEMO__' so they are 100% safe to wipe before go-live.
+// ---------------------------------------------------------------------------
+const DEMO_NAMES = [
+  "Omar", "Sara", "Youssef", "Nour", "Ahmed", "Mariam", "Khaled",
+  "Laila", "Hassan", "Dina", "Tarek", "Salma", "Amr", "Yara",
+]
+const DEMO_TRIPS = [
+  { title: "Giza Pyramids & Sphinx Day Tour", places: "Giza Pyramids, The Egyptian Museum, Cairo", plan: "Full-day guided tour of the Pyramids, the Sphinx and the Grand Egyptian Museum, with lunch by the plateau.", price_small: 2400, price_group: 9000, joined: 6, days: 9 },
+  { title: "Luxor: Valley of the Kings & Karnak", places: "Luxor, Karnak Temple, Valley of the Kings", plan: "Two days exploring the East & West Banks of Luxor — Karnak, Hatshepsut Temple and the royal tombs.", price_small: 3200, price_group: 12000, joined: 4, days: 12 },
+  { title: "Aswan & Abu Simbel Escape", places: "Aswan, Abu Simbel, Philae Temple", plan: "Nubian culture, the High Dam, Philae Temple and an early trip to the great temples of Abu Simbel.", price_small: 3600, price_group: 13500, joined: 7, days: 15 },
+  { title: "Hurghada Red Sea Getaway", places: "Hurghada, Red Sea", plan: "Three relaxed days on the Red Sea — a snorkeling boat trip, Orange Bay island and free beach time.", price_small: 3000, price_group: 11000, joined: 5, days: 10 },
+  { title: "Sharm El-Sheikh & Ras Mohamed", places: "Sharm El-Sheikh, Ras Mohamed", plan: "Diving and snorkeling in Ras Mohamed National Park plus a desert quad-bike sunset.", price_small: 3400, price_group: 12500, joined: 3, days: 18 },
+  { title: "White Desert & Bahariya Camping", places: "White Desert, Bahariya Oasis", plan: "Overnight desert safari — the White Desert chalk formations, the Black Desert and a Bedouin dinner under the stars.", price_small: 2800, price_group: 10500, joined: 8, days: 7 },
+  { title: "Siwa Oasis Adventure", places: "Siwa Oasis", plan: "Salt lakes, Cleopatra's spring, the Oracle Temple and dune surfing in the Great Sand Sea.", price_small: 3800, price_group: 14000, joined: 4, days: 20 },
+  { title: "Alexandria Mediterranean Day Trip", places: "Alexandria", plan: "The Bibliotheca, Qaitbay Citadel, the Catacombs and a seafood lunch on the Corniche.", price_small: 2200, price_group: 8500, joined: 6, days: 6 },
+  { title: "Dahab & the Blue Hole", places: "Dahab, Blue Hole", plan: "Laid-back Dahab — snorkeling the Blue Hole, the Colored Canyon and a Bedouin camp evening.", price_small: 3100, price_group: 11500, joined: 5, days: 14 },
+  { title: "Nile Cruise Luxor to Aswan", places: "Nile Cruise, Luxor, Aswan", plan: "Four-night Nile cruise visiting Edfu and Kom Ombo temples between Luxor and Aswan.", price_small: 5200, price_group: 19000, joined: 7, days: 22 },
+]
+
 let READY = false
-function ensureCol(table, col, decl) {
-  const cols = all(`PRAGMA table_info(${table})`)
-  if (!cols.some((c) => c.name === col))
-    run(`ALTER TABLE ${table} ADD COLUMN ${col} ${decl}`)
-}
 function ensureGt() {
   if (READY) return
   run(`CREATE TABLE IF NOT EXISTS settings ( key TEXT PRIMARY KEY, value TEXT )`)
@@ -38,10 +48,6 @@ function ensureGt() {
     title TEXT,
     itinerary_text TEXT,
     preferred_date TEXT,
-    date_from TEXT,
-    date_to TEXT,
-    final_date TEXT,
-    vote_deadline TEXT,
     min_people INTEGER,
     max_people INTEGER,
     small_size INTEGER,
@@ -62,23 +68,12 @@ function ensureGt() {
     trip_id INTEGER REFERENCES group_trips(id) ON DELETE CASCADE,
     user_id INTEGER REFERENCES users(id),
     name TEXT,
-    phone TEXT,
     seats INTEGER NOT NULL DEFAULT 1,
     amount REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'reserved',
-    available_days TEXT,
-    vote_date TEXT,
     referral_code TEXT,
     joined_at TEXT NOT NULL
   )`)
-  // Migrate older DBs that pre-date the date/voting columns.
-  ensureCol("group_trips", "date_from", "TEXT")
-  ensureCol("group_trips", "date_to", "TEXT")
-  ensureCol("group_trips", "final_date", "TEXT")
-  ensureCol("group_trips", "vote_deadline", "TEXT")
-  ensureCol("group_members", "phone", "TEXT")
-  ensureCol("group_members", "available_days", "TEXT")
-  ensureCol("group_members", "vote_date", "TEXT")
   const defaults = {
     gt_enabled: "1",
     gt_min_people: "10",
@@ -86,7 +81,6 @@ function ensureGt() {
     gt_small_size: "2",
     gt_deadline_days: "7",
     gt_refund_hours: "6",
-    gt_vote_hours: "48",
     gt_vehicle_tiers: JSON.stringify(DEFAULT_TIERS),
   }
   for (const [k, v] of Object.entries(defaults))
@@ -118,7 +112,6 @@ function gtSettings() {
     small_size: Number(setting("gt_small_size", "2")),
     deadline_days: Number(setting("gt_deadline_days", "7")),
     refund_hours: Number(setting("gt_refund_hours", "6")),
-    vote_hours: Number(setting("gt_vote_hours", "48")),
     vehicle_tiers: tiers,
   }
 }
@@ -132,82 +125,6 @@ function seatsCount(tripId) {
     tripId,
   )
   return Number(r.c) || 0
-}
-
-function parseDays(s) {
-  if (!s) return []
-  try {
-    const a = JSON.parse(s)
-    return Array.isArray(a) ? a.filter(Boolean) : []
-  } catch {
-    return []
-  }
-}
-
-// Every calendar day (YYYY-MM-DD) between two inclusive dates.
-function daysInRange(from, to) {
-  const out = []
-  if (!from || !to) return out
-  let d = new Date(from + "T00:00:00Z")
-  const end = new Date(to + "T00:00:00Z")
-  if (isNaN(d.getTime()) || isNaN(end.getTime())) return out
-  let guard = 0
-  while (d <= end && guard < 400) {
-    out.push(d.toISOString().slice(0, 10))
-    d = new Date(d.getTime() + 86400000)
-    guard++
-  }
-  return out
-}
-
-// Candidate days for the vote, ranked by votes, then availability, then date.
-function candidateDays(tripId) {
-  const ms = all(
-    "SELECT available_days, vote_date FROM group_members WHERE trip_id=? AND status IN ('reserved','paid')",
-    tripId,
-  )
-  const avail = {},
-    votes = {}
-  for (const m of ms) {
-    for (const d of parseDays(m.available_days)) avail[d] = (avail[d] || 0) + 1
-    if (m.vote_date) votes[m.vote_date] = (votes[m.vote_date] || 0) + 1
-  }
-  const dates = Object.keys(avail)
-  dates.sort(
-    (a, b) =>
-      (votes[b] || 0) - (votes[a] || 0) ||
-      avail[b] - avail[a] ||
-      (a < b ? -1 : a > b ? 1 : 0),
-  )
-  return dates.map((d) => ({
-    date: d,
-    available_count: avail[d],
-    votes: votes[d] || 0,
-  }))
-}
-
-// If the voting window has elapsed, auto-pick the winning day and confirm.
-function maybeFinalize(t) {
-  if (
-    t &&
-    t.status === "voting" &&
-    t.vote_deadline &&
-    Date.now() > new Date(t.vote_deadline).getTime()
-  ) {
-    const cands = candidateDays(t.id)
-    if (cands.length) {
-      const win = cands[0].date
-      run(
-        "UPDATE group_trips SET status='confirmed', final_date=?, preferred_date=?, confirmed_at=? WHERE id=?",
-        win,
-        win,
-        nowISO(),
-        t.id,
-      )
-      return get("SELECT * FROM group_trips WHERE id=?", t.id)
-    }
-  }
-  return t
 }
 
 // Current per-person price given how many seats are filled. Vehicle-based:
@@ -266,15 +183,11 @@ export const routes = [
       const created = all(
         "SELECT * FROM group_trips WHERE creator_id=? ORDER BY created_at DESC",
         user.id,
-      )
-        .map(maybeFinalize)
-        .map(tripView)
+      ).map(tripView)
       const joined = all(
         "SELECT gt.* FROM group_trips gt JOIN group_members gm ON gm.trip_id=gt.id WHERE gm.user_id=? AND gm.status IN ('reserved','paid') ORDER BY gt.created_at DESC",
         user.id,
-      )
-        .map(maybeFinalize)
-        .map(tripView)
+      ).map(tripView)
       return { created, joined }
     },
   },
@@ -294,42 +207,19 @@ export const routes = [
     },
   },
 
-  // --- My membership on a specific trip (availability + vote) --- before /:id ---
-  {
-    method: "GET",
-    path: "/api/group-trips/:id/me",
-    auth: true,
-    handler: ({ user, params }) => {
-      ensureGt()
-      const m = get(
-        "SELECT id,seats,status,phone,available_days,vote_date FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
-        params.id,
-        user.id,
-      )
-      return {
-        member: m ? { ...m, available_days: parseDays(m.available_days) } : null,
-      }
-    },
-  },
-
-  // --- Public trip detail + members + vote candidates ---
+  // --- Public trip detail + members ---
   {
     method: "GET",
     path: "/api/group-trips/:id",
     handler: ({ params }) => {
       ensureGt()
-      let t = get("SELECT * FROM group_trips WHERE id=?", params.id)
+      const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
       if (!t) err(404, "trip not found")
-      t = maybeFinalize(t)
       const members = all(
-        "SELECT id,name,seats,status,available_days,vote_date,joined_at FROM group_members WHERE trip_id=? AND status IN ('reserved','paid') ORDER BY joined_at ASC",
+        "SELECT id,name,seats,status,joined_at FROM group_members WHERE trip_id=? AND status IN ('reserved','paid') ORDER BY joined_at ASC",
         t.id,
-      ).map((m) => ({ ...m, available_days: parseDays(m.available_days) }))
-      return {
-        trip: tripView(t),
-        members,
-        candidate_days: candidateDays(t.id),
-      }
+      )
+      return { trip: tripView(t), members }
     },
   },
 
@@ -344,18 +234,12 @@ export const routes = [
       const itinerary = String(body.itinerary_text || "").trim()
       if (!itinerary) err(400, "itinerary_text is required")
       const title = String(body.title || "").trim() || "رحلة مخصّصة"
-      const date_from = body.date_from || null
-      const date_to = body.date_to || null
-      if (date_from && date_to && date_from > date_to)
-        err(400, "date_to must be after date_from")
       const info = run(
-        "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,date_from,date_to,min_people,max_people,small_size,share_code,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,min_people,max_people,small_size,share_code,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         user.id,
         title,
         itinerary,
-        date_from || body.preferred_date || null,
-        date_from,
-        date_to,
+        body.preferred_date || null,
         s.min_people,
         s.max_people,
         s.small_size,
@@ -375,7 +259,7 @@ export const routes = [
     method: "POST",
     path: "/api/group-trips/:id/accept",
     auth: true,
-    handler: ({ user, params, body }) => {
+    handler: ({ user, params }) => {
       ensureGt()
       const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
       if (!t) err(404, "trip not found")
@@ -391,27 +275,6 @@ export const routes = [
         deadline,
         t.id,
       )
-      // The creator is also a traveller: available on the whole range they set.
-      const exists = get(
-        "SELECT id FROM group_members WHERE trip_id=? AND user_id=?",
-        t.id,
-        t.creator_id,
-      )
-      if (!exists) {
-        const allDays = daysInRange(t.date_from, t.date_to)
-        run(
-          "INSERT INTO group_members (trip_id,user_id,name,phone,seats,amount,status,available_days,joined_at) VALUES (?,?,?,?,?,?,?,?,?)",
-          t.id,
-          t.creator_id,
-          (body && body.name) || user.name || null,
-          (body && body.phone) || null,
-          1,
-          0,
-          "reserved",
-          JSON.stringify(allDays),
-          nowISO(),
-        )
-      }
       return get("SELECT * FROM group_trips WHERE id=?", t.id)
     },
   },
@@ -436,77 +299,30 @@ export const routes = [
         user.id,
       )
       if (existing) err(400, "you already joined this trip")
-      // Availability: must pick days that fall inside the creator's range.
-      let days = Array.isArray(body.available_days)
-        ? body.available_days.filter(Boolean)
-        : []
-      const range = daysInRange(t.date_from, t.date_to)
-      if (range.length) {
-        if (!days.length) err(400, "select at least one available day")
-        const valid = new Set(range)
-        for (const d of days)
-          if (!valid.has(d)) err(400, "day out of range: " + d)
-      }
       const pp = perPerson(t, count + seats)
       const amount = pp != null ? round2(pp * seats) : 0
       run(
-        "INSERT INTO group_members (trip_id,user_id,name,phone,seats,amount,status,available_days,referral_code,joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO group_members (trip_id,user_id,name,seats,amount,status,referral_code,joined_at) VALUES (?,?,?,?,?,?,?,?)",
         t.id,
         user.id,
         body.name || user.name || null,
-        body.phone || null,
         seats,
         amount,
         "reserved",
-        JSON.stringify(days),
         body.referral_code || null,
         nowISO(),
       )
-      // When the minimum is reached, open the vote instead of confirming.
+      // Auto-confirm when the minimum is reached.
       const newCount = seatsCount(t.id)
-      if (t.min_people && newCount >= t.min_people && t.status === "open") {
-        const s = gtSettings()
-        const vd = new Date(
-          Date.now() + (s.vote_hours || 48) * 3600000,
-        ).toISOString()
+      if (t.min_people && newCount >= t.min_people && t.status === "open")
         run(
-          "UPDATE group_trips SET status='voting', vote_deadline=? WHERE id=?",
-          vd,
+          "UPDATE group_trips SET status='confirmed', confirmed_at=? WHERE id=?",
+          nowISO(),
           t.id,
         )
-      }
       return {
         ok: true,
         trip: tripView(get("SELECT * FROM group_trips WHERE id=?", t.id)),
-      }
-    },
-  },
-
-  // --- Member votes for a final date (must be a day they are available on) ---
-  {
-    method: "POST",
-    path: "/api/group-trips/:id/vote",
-    auth: true,
-    handler: ({ user, params, body }) => {
-      ensureGt()
-      let t = get("SELECT * FROM group_trips WHERE id=?", params.id)
-      if (!t) err(404, "trip not found")
-      t = maybeFinalize(t)
-      if (t.status !== "voting") err(400, "voting is not open")
-      const m = get(
-        "SELECT * FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
-        t.id,
-        user.id,
-      )
-      if (!m) err(403, "you are not a member of this trip")
-      const date = String(body.date || "")
-      if (!parseDays(m.available_days).includes(date))
-        err(400, "you can only vote for a day you are available on")
-      run("UPDATE group_members SET vote_date=? WHERE id=?", date, m.id)
-      return {
-        ok: true,
-        candidate_days: candidateDays(t.id),
-        vote_deadline: t.vote_deadline,
       }
     },
   },
@@ -527,14 +343,11 @@ export const routes = [
       )
       if (!m) err(404, "you are not a member of this trip")
       const s = gtSettings()
-      const tripDate = t.final_date || t.preferred_date
-      if (tripDate) {
-        const cutoff = new Date(tripDate).getTime() - s.refund_hours * 3600000
+      if (t.preferred_date) {
+        const cutoff =
+          new Date(t.preferred_date).getTime() - s.refund_hours * 3600000
         if (Date.now() > cutoff)
-          err(
-            400,
-            "refund window has passed (" + s.refund_hours + "h before trip)",
-          )
+          err(400, "refund window has passed (" + s.refund_hours + "h before trip)")
       }
       run("UPDATE group_members SET status='cancelled' WHERE id=?", m.id)
       return { ok: true }
@@ -556,7 +369,6 @@ export const routes = [
         gt_small_size: "small_size",
         gt_deadline_days: "deadline_days",
         gt_refund_hours: "refund_hours",
-        gt_vote_hours: "vote_hours",
       }
       for (const [key, field] of Object.entries(num))
         if (body[field] !== undefined && body[field] !== null)
@@ -582,11 +394,11 @@ export const routes = [
             query.status,
           )
         : all("SELECT * FROM group_trips ORDER BY created_at DESC")
-      return { trips: rows.map(maybeFinalize).map(tripView) }
+      return { trips: rows.map(tripView) }
     },
   },
 
-  // --- Admin prices a request (small price + group price) -> status 'quoted' ---
+  // --- Admin prices a request (ملاكي price + باص price) -> status 'quoted' ---
   {
     method: "POST",
     path: "/api/admin/group-trips/:id/quote",
@@ -620,33 +432,7 @@ export const routes = [
     },
   },
 
-  // --- Admin force-finalizes the date (pick top vote now or a specific date) ---
-  {
-    method: "POST",
-    path: "/api/admin/group-trips/:id/finalize",
-    auth: ["admin"],
-    handler: ({ params, body }) => {
-      ensureGt()
-      const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
-      if (!t) err(404, "trip not found")
-      let date = body.date
-      if (!date) {
-        const c = candidateDays(t.id)
-        if (!c.length) err(400, "no candidate days to finalize")
-        date = c[0].date
-      }
-      run(
-        "UPDATE group_trips SET status='confirmed', final_date=?, preferred_date=?, confirmed_at=? WHERE id=?",
-        date,
-        date,
-        nowISO(),
-        t.id,
-      )
-      return get("SELECT * FROM group_trips WHERE id=?", t.id)
-    },
-  },
-
-  // --- Admin changes trip status ---
+  // --- Admin changes trip status (open/confirmed/completed/cancelled/expired) ---
   {
     method: "POST",
     path: "/api/admin/group-trips/:id/status",
@@ -660,7 +446,6 @@ export const routes = [
         "pending",
         "quoted",
         "open",
-        "voting",
         "confirmed",
         "completed",
         "cancelled",
@@ -690,7 +475,7 @@ export const routes = [
         members: all(
           "SELECT * FROM group_members WHERE trip_id=? ORDER BY joined_at ASC",
           params.id,
-        ).map((m) => ({ ...m, available_days: parseDays(m.available_days) })),
+        ),
       }
     },
   },
@@ -718,6 +503,91 @@ export const routes = [
         m.id,
       )
       return get("SELECT * FROM group_members WHERE id=?", m.id)
+    },
+  },
+
+  // =================== TEMP DEMO SHOWCASE (remove at go-live) ===============
+
+  // --- Seed 10 ready-made OPEN trips so the public strip has content ---
+  // Safe to re-run: it wipes previous demo rows first. All rows are tagged
+  // admin_note='__DEMO__' and removed by /clear-demo below.
+  {
+    method: "POST",
+    path: "/api/admin/group-trips/seed-demo",
+    auth: ["admin"],
+    handler: ({ user }) => {
+      ensureGt()
+      // wipe any previous demo rows first (idempotent)
+      for (const o of all(
+        "SELECT id FROM group_trips WHERE admin_note=?",
+        "__DEMO__",
+      )) {
+        run("DELETE FROM group_members WHERE trip_id=?", o.id)
+        run("DELETE FROM group_trips WHERE id=?", o.id)
+      }
+      const now = Date.now()
+      let created = 0
+      DEMO_TRIPS.forEach((d, idx) => {
+        const deadline = new Date(now + d.days * 86400000).toISOString()
+        const preferred = new Date(now + (d.days + 5) * 86400000)
+          .toISOString()
+          .slice(0, 10)
+        const info = run(
+          "INSERT INTO group_trips (creator_id,title,itinerary_text,preferred_date,min_people,max_people,small_size,group_size,price_small,price_group,vehicle_small,vehicle_group,deadline,share_code,admin_note,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          user.id,
+          d.title,
+          "Places: " + d.places + "\n\n" + d.plan,
+          preferred,
+          10,
+          14,
+          2,
+          10,
+          d.price_small,
+          d.price_group,
+          "ملاكي",
+          "باص",
+          deadline,
+          "DEMO-" + (1001 + idx),
+          "__DEMO__",
+          "open",
+          nowISO(),
+        )
+        const tripId = Number(info.lastInsertRowid)
+        const amount = round2(d.price_group / 10)
+        for (let i = 0; i < d.joined; i++) {
+          run(
+            "INSERT INTO group_members (trip_id,user_id,name,seats,amount,status,joined_at) VALUES (?,?,?,?,?,?,?)",
+            tripId,
+            null,
+            DEMO_NAMES[(idx + i) % DEMO_NAMES.length],
+            1,
+            amount,
+            "reserved",
+            nowISO(),
+          )
+        }
+        created++
+      })
+      return { ok: true, created }
+    },
+  },
+
+  // --- Remove ALL demo trips + their demo members in one shot ---
+  {
+    method: "POST",
+    path: "/api/admin/group-trips/clear-demo",
+    auth: ["admin"],
+    handler: () => {
+      ensureGt()
+      const rows = all(
+        "SELECT id FROM group_trips WHERE admin_note=?",
+        "__DEMO__",
+      )
+      for (const o of rows) {
+        run("DELETE FROM group_members WHERE trip_id=?", o.id)
+        run("DELETE FROM group_trips WHERE id=?", o.id)
+      }
+      return { ok: true, removed: rows.length }
     },
   },
 ]
