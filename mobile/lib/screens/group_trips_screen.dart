@@ -7,29 +7,96 @@ import '../theme.dart';
 // =============================================================================
 // Group Trips / "Create your journey" — mirrors the website feature.
 //
-// Data is loaded from the backend (GET /api/group-trips). When the endpoint is
-// not reachable yet, the screen gracefully falls back to the built-in demo
-// trips — exactly the same offline-first pattern the rest of the app uses.
+// Fully wired to the backend:
+//   • Create  -> POST /api/group-trips/request   (title, itinerary, date_from, date_to)
+//   • Detail  -> GET  /api/group-trips/:id        (trip, members, candidate_days)
+//   • Mine    -> GET  /api/group-trips/:id/me      (my membership + available_days)
+//   • Join    -> POST /api/group-trips/:id/join   (seats, name, phone, available_days[])
+//   • Vote    -> POST /api/group-trips/:id/vote   (date)  — members only
+//
+// The creator picks a DATE WINDOW they are available. Everyone who joins picks
+// which days within that window suits them. Only members vote — and only on the
+// days they said they're available for. When the endpoint isn't reachable the
+// screen still falls back to the built-in demo trips (offline-first).
 // =============================================================================
 
 num _num(dynamic v) => v is num ? v : num.tryParse('${v ?? ''}') ?? 0;
 
 String usd(num v) => '\$${v.toStringAsFixed(0)}';
 
+const List<String> _months = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+String _fmt(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+String _prettyDate(String iso) {
+  final d = DateTime.tryParse(iso);
+  if (d == null) return iso;
+  return '${_months[d.month - 1]} ${d.day}';
+}
+
+/// All calendar days between two YYYY-MM-DD strings (inclusive, capped).
+List<String> _daysBetween(String? from, String? to) {
+  final a = DateTime.tryParse('$from');
+  final b = DateTime.tryParse('$to');
+  if (a == null || b == null) return const [];
+  final out = <String>[];
+  var d = DateTime(a.year, a.month, a.day);
+  final end = DateTime(b.year, b.month, b.day);
+  var guard = 0;
+  while (!d.isAfter(end) && guard < 120) {
+    out.add(_fmt(d));
+    d = d.add(const Duration(days: 1));
+    guard++;
+  }
+  return out;
+}
+
+String _statusLabel(String s) {
+  switch (s) {
+    case 'open':
+      return 'Filling up';
+    case 'voting':
+      return 'Voting open';
+    case 'quoted':
+      return 'Quoted';
+    case 'confirmed':
+      return 'Confirmed';
+    case 'closed':
+      return 'Closed';
+    default:
+      return 'Open';
+  }
+}
+
 class GroupTrip {
+  final int id; // 0 = demo / offline
   final String name;
   final num priceUsd;
   final int daysLeft;
   final int joined;
   final int minGroup;
   final bool vote;
+  final String status;
+  final String? dateFrom;
+  final String? dateTo;
+  final String itinerary;
+
   const GroupTrip({
     required this.name,
     required this.priceUsd,
     required this.daysLeft,
     required this.joined,
+    this.id = 0,
     this.minGroup = 10,
     this.vote = false,
+    this.status = '',
+    this.dateFrom,
+    this.dateTo,
+    this.itinerary = '',
   });
 
   double get progress {
@@ -38,17 +105,49 @@ class GroupTrip {
     return p < 0 ? 0 : (p > 1 ? 1 : p);
   }
 
-  factory GroupTrip.fromJson(Map<String, dynamic> j) => GroupTrip(
-        name: '${j['name'] ?? j['title'] ?? j['destination'] ?? ''}',
-        priceUsd: _num(j['price_usd'] ?? j['price'] ?? j['usd'] ?? 0),
-        daysLeft: _num(j['days_left'] ?? j['days'] ?? j['deadline_days'] ?? 0).toInt(),
-        joined: _num(j['joined'] ?? j['members'] ?? j['count'] ?? 0).toInt(),
-        minGroup: _num(j['min_group'] ?? j['min_people'] ?? 10).toInt(),
-        vote: j['vote'] == true || j['voting'] == true || j['status'] == 'voting',
-      );
+  static String _mainPlace(String itinerary, String fallback) {
+    final m = RegExp(r'Places:\s*([^\n,]+)', caseSensitive: false)
+        .firstMatch(itinerary);
+    final v = m?.group(1)?.trim();
+    return (v != null && v.isNotEmpty) ? v : fallback;
+  }
+
+  static int _daysLeftFrom(Map<String, dynamic> j) {
+    final raw = j['days_left'] ?? j['deadline_days'];
+    if (raw != null) return _num(raw).toInt();
+    final iso = j['vote_deadline'] ?? j['deadline'] ?? j['date_to'];
+    final d = DateTime.tryParse('${iso ?? ''}');
+    if (d == null) return 0;
+    final diff = d.difference(DateTime.now()).inDays;
+    return diff < 0 ? 0 : diff;
+  }
+
+  factory GroupTrip.fromJson(Map<String, dynamic> j) {
+    final itinerary = '${j['itinerary_text'] ?? ''}';
+    final title = '${j['title'] ?? j['name'] ?? j['destination'] ?? ''}'.trim();
+    final status = '${j['status'] ?? ''}';
+    return GroupTrip(
+      id: _num(j['id']).toInt(),
+      name: title.isNotEmpty ? title : _mainPlace(itinerary, 'Group trip'),
+      priceUsd: _num(j['current_per_person'] ??
+          j['small_per_person'] ??
+          j['price_small'] ??
+          j['price'] ??
+          j['usd'] ??
+          0),
+      daysLeft: _daysLeftFrom(j),
+      joined: _num(j['members_count'] ?? j['joined'] ?? j['members'] ?? 0).toInt(),
+      minGroup: _num(j['min_people'] ?? j['min_group'] ?? 10).toInt(),
+      vote: status == 'voting' || j['vote'] == true || j['voting'] == true,
+      status: status,
+      dateFrom: j['date_from']?.toString(),
+      dateTo: j['date_to']?.toString(),
+      itinerary: itinerary,
+    );
+  }
 }
 
-// The same 10 trips shown on the website strip (USD, per person).
+// The same 10 trips shown on the website strip (USD, per person) — offline demo.
 const List<GroupTrip> demoGroupTrips = [
   GroupTrip(name: 'Giza & the Pyramids', priceUsd: 50, daysLeft: 9, joined: 6),
   GroupTrip(name: 'Luxor — Valley of Kings', priceUsd: 65, daysLeft: 12, joined: 4),
@@ -134,7 +233,7 @@ class CreateJourneyBanner extends StatelessWidget {
           const Text('Create your journey',
               style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800, height: 1.15)),
           const SizedBox(height: 6),
-          const Text('Design your own trip — other travellers can join you and share the cost.',
+          const Text('Design your own trip — pick the days you are free, other travellers join and share the cost.',
               style: TextStyle(color: Color(0xFFDCE6E9), fontSize: 13.5, height: 1.35)),
           const SizedBox(height: 16),
           Row(
@@ -200,12 +299,12 @@ class _GroupTripsStripState extends State<GroupTripsStrip> {
         final trips = snap.data ?? demoGroupTrips;
         if (trips.isEmpty) return const SizedBox.shrink();
         return SizedBox(
-          height: 170,
+          height: 148,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: trips.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (c, i) => _TripCard(
               trip: trips[i],
               onTap: () => openTripDetail(context, trips[i]),
@@ -227,10 +326,10 @@ class _TripCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 186,
-        padding: const EdgeInsets.all(14),
+        width: 150,
+        padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(13),
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -243,56 +342,56 @@ class _TripCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.orange,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(usd(trip.priceUsd),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11.5)),
                 ),
                 const Spacer(),
                 if (trip.vote)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.16),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: const Text('VOTE',
-                        style: TextStyle(color: Color(0xFFFFD9A8), fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.5)),
+                        style: TextStyle(color: Color(0xFFFFD9A8), fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.5)),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 9),
             Text(
               trip.name,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15, height: 1.2),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13, height: 1.2),
             ),
             const Spacer(),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 value: trip.progress,
-                minHeight: 5,
+                minHeight: 4,
                 backgroundColor: Colors.white24,
                 valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 7),
             Row(
               children: [
-                const Icon(Icons.group_rounded, size: 14, color: Color(0xFFDCE6E9)),
-                const SizedBox(width: 4),
+                const Icon(Icons.group_rounded, size: 12, color: Color(0xFFDCE6E9)),
+                const SizedBox(width: 3),
                 Text('${trip.joined}/${trip.minGroup}',
-                    style: const TextStyle(color: Color(0xFFDCE6E9), fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(color: Color(0xFFDCE6E9), fontSize: 10.5, fontWeight: FontWeight.w600)),
                 const Spacer(),
-                const Icon(Icons.schedule_rounded, size: 14, color: Color(0xFFDCE6E9)),
-                const SizedBox(width: 4),
-                Text('${trip.daysLeft}d left',
-                    style: const TextStyle(color: Color(0xFFDCE6E9), fontSize: 12, fontWeight: FontWeight.w600)),
+                const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFFDCE6E9)),
+                const SizedBox(width: 3),
+                Text('${trip.daysLeft}d',
+                    style: const TextStyle(color: Color(0xFFDCE6E9), fontSize: 10.5, fontWeight: FontWeight.w600)),
               ],
             ),
           ],
@@ -346,7 +445,7 @@ class _GroupTripsScreenState extends State<GroupTripsScreen> {
                 const Text('Open group trips',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
                 const SizedBox(height: 4),
-                const Text('Join a trip below — once the group fills up, it is confirmed and the price is shared.',
+                const Text('Join a trip below, pick the days you are free, then vote once the group fills up.',
                     style: TextStyle(color: AppColors.text2, fontSize: 13)),
                 const SizedBox(height: 14),
                 ...trips.map((t) => Padding(
@@ -455,7 +554,7 @@ class _TripWideCard extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Trip detail bottom sheet (join / vote).
+// Trip detail bottom sheet (join / vote) — live backend + demo fallback.
 // -----------------------------------------------------------------------------
 void openTripDetail(BuildContext context, GroupTrip trip) {
   showModalBottomSheet<void>(
@@ -478,7 +577,35 @@ class _TripDetailSheet extends StatefulWidget {
 }
 
 class _TripDetailSheetState extends State<_TripDetailSheet> {
+  // demo path
   int _voteIndex = 1;
+
+  // live path
+  bool _loading = false;
+  bool _busy = false;
+  String? _error;
+  Map<String, dynamic>? _detail;
+  Map<String, dynamic>? _me;
+
+  final _joinName = TextEditingController();
+  final _joinPhone = TextEditingController();
+  final Set<String> _joinDays = <String>{};
+  int _joinSeats = 1;
+
+  AppState get _app => widget.rootContext.read<AppState>();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.trip.id > 0) _load(initial: true);
+  }
+
+  @override
+  void dispose() {
+    _joinName.dispose();
+    _joinPhone.dispose();
+    super.dispose();
+  }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(widget.rootContext).showSnackBar(
@@ -486,130 +613,353 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
     );
   }
 
+  Future<void> _load({bool initial = false}) async {
+    if (widget.trip.id <= 0) return;
+    if (initial) setState(() => _loading = true);
+    try {
+      final res = await _app.api.get('/api/group-trips/${widget.trip.id}');
+      final detail = Map<String, dynamic>.from(res as Map);
+      Map<String, dynamic>? me;
+      if (_app.isLoggedIn) {
+        try {
+          me = Map<String, dynamic>.from(
+              await _app.api.get('/api/group-trips/${widget.trip.id}/me') as Map);
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() {
+        _detail = detail;
+        _me = me;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e is ApiException ? e.message : 'Could not load this trip.';
+      });
+    }
+  }
+
+  Future<void> _join(List<String> rangeDays) async {
+    if (!_app.isLoggedIn) {
+      _snack('Log in from the Account tab to join this trip.');
+      return;
+    }
+    if (rangeDays.isNotEmpty && _joinDays.isEmpty) {
+      _snack('Please choose at least one day you are available.');
+      return;
+    }
+    if (_joinName.text.trim().isEmpty) {
+      _snack('Please enter your name.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final days = _joinDays.toList()..sort();
+      await _app.api.post('/api/group-trips/${widget.trip.id}/join', {
+        'seats': _joinSeats,
+        'name': _joinName.text.trim(),
+        'phone': _joinPhone.text.trim(),
+        'available_days': days,
+      });
+      await _load();
+      _snack('You joined the trip! You can vote on a day once voting opens.');
+    } catch (e) {
+      _snack(e is ApiException ? e.message : 'Could not join. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _vote(String date) async {
+    if (!_app.isLoggedIn) {
+      _snack('Log in from the Account tab to vote.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await _app.api.post('/api/group-trips/${widget.trip.id}/vote', {'date': date});
+      await _load();
+      _snack('Your vote for ${_prettyDate(date)} was recorded.');
+    } catch (e) {
+      _snack(e is ApiException ? e.message : 'Could not record your vote.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final trip = widget.trip;
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.7,
+      initialChildSize: 0.78,
       minChildSize: 0.4,
-      maxChildSize: 0.92,
-      builder: (context, scroll) => ListView(
-        controller: scroll,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        children: [
-          Center(
-            child: Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(999),
-              ),
+      maxChildSize: 0.95,
+      builder: (context, scroll) {
+        final handle = Center(
+          child: Container(
+            width: 42,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-          const SizedBox(height: 16),
+        );
+        if (widget.trip.id <= 0) return _buildDemo(scroll, handle);
+        if (_loading) {
+          return ListView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            children: [handle, const SizedBox(height: 48), const Center(child: CircularProgressIndicator()), const SizedBox(height: 48)],
+          );
+        }
+        return _buildLive(scroll, handle);
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // LIVE trip (backed by the API)
+  // ---------------------------------------------------------------------------
+  Widget _buildLive(ScrollController scroll, Widget handle) {
+    final trip = widget.trip;
+    final t = (_detail?['trip'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final candidateDays = (_detail?['candidate_days'] as List?) ?? const [];
+    final member = _me?['member'] as Map?;
+    final isMember = member != null;
+    final myAvailable = <String>[
+      ...((member?['available_days'] as List?)?.map((e) => '$e') ?? const [])
+    ];
+    final myVote = member?['vote_date'] == null ? null : '${member!['vote_date']}';
+
+    final status = '${t['status'] ?? trip.status}';
+    final dateFrom = t['date_from']?.toString() ?? trip.dateFrom;
+    final dateTo = t['date_to']?.toString() ?? trip.dateTo;
+    final joined = _num(t['members_count'] ?? trip.joined).toInt();
+    final minGroup = _num(t['min_people'] ?? trip.minGroup).toInt();
+    final price = _num(t['current_per_person'] ??
+        t['small_per_person'] ??
+        t['price_small'] ??
+        trip.priceUsd);
+    final progress = minGroup <= 0 ? 0.0 : (joined / minGroup).clamp(0.0, 1.0);
+    final rangeDays = _daysBetween(dateFrom, dateTo);
+    final showVoting = status == 'voting' || candidateDays.isNotEmpty;
+
+    return ListView(
+      controller: scroll,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      children: [
+        handle,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(trip.name,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 21, height: 1.15)),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(usd(price),
+                    style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 22)),
+                const Text('per person', style: TextStyle(color: AppColors.text2, fontSize: 11)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _StatBox(icon: Icons.group_rounded, label: 'Joined', value: '$joined/$minGroup'),
+            const SizedBox(width: 10),
+            _StatBox(icon: Icons.flag_rounded, label: 'Status', value: _statusLabel(status)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: progress.toDouble(),
+            minHeight: 7,
+            backgroundColor: AppColors.soft,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text('${(minGroup - joined).clamp(0, minGroup)} more travellers needed to confirm this trip.',
+            style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
+        if (dateFrom != null && dateTo != null) ...[
+          const SizedBox(height: 14),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Icon(Icons.date_range_rounded, size: 18, color: AppColors.blue),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(trip.name,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 21, height: 1.15)),
+                child: Text('Available window: ${_prettyDate(dateFrom)} – ${_prettyDate(dateTo)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            ],
+          ),
+        ],
+        const SizedBox(height: 22),
+        const Text("What's included", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        const SizedBox(height: 10),
+        ...kTripIncludes.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
                 children: [
-                  Text(usd(trip.priceUsd),
-                      style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 22)),
-                  const Text('per person', style: TextStyle(color: AppColors.text2, fontSize: 11)),
+                  const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.green),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(e, style: const TextStyle(fontSize: 13.5))),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _StatBox(icon: Icons.group_rounded, label: 'Joined', value: '${trip.joined}/${trip.minGroup}'),
-              const SizedBox(width: 10),
-              _StatBox(icon: Icons.schedule_rounded, label: 'Closes in', value: '${trip.daysLeft} days'),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: trip.progress,
-              minHeight: 7,
-              backgroundColor: AppColors.soft,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text('${(trip.minGroup - trip.joined).clamp(0, trip.minGroup)} more travellers needed to confirm this trip.',
-              style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
-          const SizedBox(height: 22),
-          const Text("What's included",
+            )),
+
+        // ----- Voting (members only) -----
+        if (showVoting) ...[
+          const SizedBox(height: 20),
+          const Text('Vote on the departure date',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 4),
+          const Text('Only members can vote — and only for the days they said they are available. The day with the most votes wins.',
+              style: TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
           const SizedBox(height: 10),
-          ...kTripIncludes.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.green),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(e, style: const TextStyle(fontSize: 13.5))),
-                  ],
-                ),
-              )),
-          if (trip.vote) ...[
-            const SizedBox(height: 18),
-            const Text('Vote on the departure date',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-            const SizedBox(height: 4),
-            const Text('The date with the most votes wins.',
-                style: TextStyle(color: AppColors.text2, fontSize: 12.5)),
-            const SizedBox(height: 10),
-            ...List.generate(kVoteDates.length, (i) {
-              final d = kVoteDates[i];
-              final selected = _voteIndex == i;
+          if (!isMember)
+            _noteBox('Join the trip below to vote on the departure day.')
+          else if (candidateDays.isEmpty)
+            _noteBox('Voting opens once enough travellers join. Your available days are saved.')
+          else
+            ...candidateDays.map((c) {
+              final m = Map<String, dynamic>.from(c as Map);
+              final date = '${m['date']}';
+              final votes = _num(m['votes']).toInt();
+              final avail = _num(m['available_count']).toInt();
+              final canVote = myAvailable.contains(date);
+              final mine = myVote == date;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(kRadius),
-                  onTap: () => setState(() => _voteIndex = i),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.blueSoft : AppColors.soft,
-                      borderRadius: BorderRadius.circular(kRadius),
-                      border: Border.all(color: selected ? AppColors.blue : AppColors.border, width: selected ? 1.5 : 1),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                            size: 20, color: selected ? AppColors.blue : AppColors.text2),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(d.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-                        Text('${d.votes} votes', style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
-                      ],
+                  onTap: (_busy || !canVote) ? null : () => _vote(date),
+                  child: Opacity(
+                    opacity: canVote ? 1 : 0.5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: mine ? AppColors.blueSoft : AppColors.soft,
+                        borderRadius: BorderRadius.circular(kRadius),
+                        border: Border.all(color: mine ? AppColors.blue : AppColors.border, width: mine ? 1.5 : 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(mine ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                              size: 20, color: mine ? AppColors.blue : AppColors.text2),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(_prettyDate(date),
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          ),
+                          Text('$votes votes · $avail free',
+                              style: const TextStyle(color: AppColors.text2, fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               );
             }),
-            const SizedBox(height: 6),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _snack('Vote recorded for ${kVoteDates[_voteIndex].label}.');
-                },
-                child: const Text('Submit my vote'),
-              ),
+        ],
+
+        const SizedBox(height: 20),
+
+        // ----- Join / membership -----
+        if (isMember)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.green.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(kRadius),
+              border: Border.all(color: AppColors.green.withOpacity(0.4)),
             ),
-          ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text("You're in this trip", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  ],
+                ),
+                if (myAvailable.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('Your available days: ${myAvailable.map(_prettyDate).join(', ')}',
+                      style: const TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
+                ],
+              ],
+            ),
+          )
+        else if (!_app.isLoggedIn)
+          _noteBox('Log in from the Account tab to join this trip and pick your available days.')
+        else if (status == 'open') ...[
+          const Text('Choose the days you can travel',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 4),
+          const Text('Pick every day within the window that works for you. We use these to find the best departure day.',
+              style: TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
+          const SizedBox(height: 10),
+          if (rangeDays.isEmpty)
+            _noteBox('The organiser has not set a date window yet.')
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: rangeDays.map((d) {
+                final sel = _joinDays.contains(d);
+                return GestureDetector(
+                  onTap: () => setState(() => sel ? _joinDays.remove(d) : _joinDays.add(d)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: sel ? AppColors.blue : AppColors.soft,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: sel ? AppColors.blue : AppColors.border),
+                    ),
+                    child: Text(_prettyDate(d),
+                        style: TextStyle(
+                            color: sel ? Colors.white : AppColors.text,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5)),
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 16),
+          const Text('Seats', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _StepBtn(icon: Icons.remove_rounded, onTap: () => setState(() => _joinSeats = (_joinSeats - 1).clamp(1, 10))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Text('$_joinSeats', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              ),
+              _StepBtn(icon: Icons.add_rounded, onTap: () => setState(() => _joinSeats = (_joinSeats + 1).clamp(1, 10))),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text('Your name', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          TextField(controller: _joinName, decoration: const InputDecoration(hintText: 'Full name')),
+          const SizedBox(height: 12),
+          const Text('Phone (optional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          TextField(controller: _joinPhone, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: 'WhatsApp number')),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -619,15 +969,161 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
+              onPressed: _busy ? null : () => _join(rangeDays),
+              child: _busy
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Join this trip', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            ),
+          ),
+        ] else
+          _noteBox('This trip is no longer open for new members.'),
+
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 12.5)),
+        ],
+      ],
+    );
+  }
+
+  Widget _noteBox(String msg) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.soft,
+          borderRadius: BorderRadius.circular(kRadius),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Text(msg, style: const TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
+      );
+
+  // ---------------------------------------------------------------------------
+  // DEMO trip (offline fallback) — unchanged behaviour
+  // ---------------------------------------------------------------------------
+  Widget _buildDemo(ScrollController scroll, Widget handle) {
+    final trip = widget.trip;
+    return ListView(
+      controller: scroll,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      children: [
+        handle,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(trip.name,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 21, height: 1.15)),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(usd(trip.priceUsd),
+                    style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 22)),
+                const Text('per person', style: TextStyle(color: AppColors.text2, fontSize: 11)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _StatBox(icon: Icons.group_rounded, label: 'Joined', value: '${trip.joined}/${trip.minGroup}'),
+            const SizedBox(width: 10),
+            _StatBox(icon: Icons.schedule_rounded, label: 'Closes in', value: '${trip.daysLeft} days'),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: trip.progress,
+            minHeight: 7,
+            backgroundColor: AppColors.soft,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text('${(trip.minGroup - trip.joined).clamp(0, trip.minGroup)} more travellers needed to confirm this trip.',
+            style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
+        const SizedBox(height: 22),
+        const Text("What's included", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        const SizedBox(height: 10),
+        ...kTripIncludes.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.green),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(e, style: const TextStyle(fontSize: 13.5))),
+                ],
+              ),
+            )),
+        if (trip.vote) ...[
+          const SizedBox(height: 18),
+          const Text('Vote on the departure date',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 4),
+          const Text('The date with the most votes wins.',
+              style: TextStyle(color: AppColors.text2, fontSize: 12.5)),
+          const SizedBox(height: 10),
+          ...List.generate(kVoteDates.length, (i) {
+            final d = kVoteDates[i];
+            final selected = _voteIndex == i;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(kRadius),
+                onTap: () => setState(() => _voteIndex = i),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.blueSoft : AppColors.soft,
+                    borderRadius: BorderRadius.circular(kRadius),
+                    border: Border.all(color: selected ? AppColors.blue : AppColors.border, width: selected ? 1.5 : 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                          size: 20, color: selected ? AppColors.blue : AppColors.text2),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(d.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+                      Text('${d.votes} votes', style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
               onPressed: () {
                 Navigator.pop(context);
-                _snack("You joined ${trip.name}! We'll notify you once the group is confirmed.");
+                _snack('Vote recorded for ${kVoteDates[_voteIndex].label}.');
               },
-              child: const Text('Join this trip', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              child: const Text('Submit my vote'),
             ),
           ),
         ],
-      ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.orange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _snack("You joined ${trip.name}! We'll notify you once the group is confirmed.");
+            },
+            child: const Text('Join this trip', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -665,7 +1161,8 @@ class _StatBox extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// "Create your journey" request sheet.
+// "Create your journey" request sheet — now with a DATE RANGE (availability
+// window) instead of a single day, and posts to the real backend.
 // -----------------------------------------------------------------------------
 void openCreateJourney(BuildContext context) {
   showModalBottomSheet<void>(
@@ -692,9 +1189,11 @@ class _CreateJourneySheet extends StatefulWidget {
 class _CreateJourneySheetState extends State<_CreateJourneySheet> {
   final _destCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  int _pax = 2;
-  DateTime? _date;
+  DateTimeRange? _range;
+  bool _busy = false;
   String? _error;
+
+  AppState get _app => widget.rootContext.read<AppState>();
 
   @override
   void dispose() {
@@ -703,36 +1202,70 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickRange() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: now.add(const Duration(days: 14)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+      initialDateRange: _range ??
+          DateTimeRange(
+            start: today.add(const Duration(days: 14)),
+            end: today.add(const Duration(days: 18)),
+          ),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) setState(() => _range = picked);
   }
 
-  void _submit() {
-    if (_destCtrl.text.trim().isEmpty) {
+  Future<void> _submit() async {
+    if (!_app.isLoggedIn) {
+      setState(() => _error = 'Please log in from the Account tab first.');
+      return;
+    }
+    final dest = _destCtrl.text.trim();
+    if (dest.isEmpty) {
       setState(() => _error = 'Please enter a destination.');
       return;
     }
-    Navigator.pop(context);
-    ScaffoldMessenger.of(widget.rootContext).showSnackBar(
-      SnackBar(
-        content: Text('Journey request sent for "${_destCtrl.text.trim()}". We will open it for others to join.'),
-        backgroundColor: AppColors.blue,
-      ),
-    );
+    if (_range == null) {
+      setState(() => _error = 'Please choose the date window you are available.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final notes = _notesCtrl.text.trim();
+      await _app.api.post('/api/group-trips/request', {
+        'title': dest,
+        'itinerary_text': notes.isEmpty ? 'Places: $dest' : 'Places: $dest\n\n$notes',
+        'date_from': _fmt(_range!.start),
+        'date_to': _fmt(_range!.end),
+      });
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(widget.rootContext).showSnackBar(
+        SnackBar(
+          content: Text('Journey request sent for "$dest". We will open it for others to join.'),
+          backgroundColor: AppColors.blue,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e is ApiException ? e.message : 'Something went wrong. Please try again.';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateLabel = _date == null
-        ? 'Pick a start date'
-        : '${_date!.year}-${_date!.month.toString().padLeft(2, '0')}-${_date!.day.toString().padLeft(2, '0')}';
+    final rangeLabel = _range == null
+        ? 'Pick the days you are available'
+        : '${_prettyDate(_fmt(_range!.start))} – ${_prettyDate(_fmt(_range!.end))}';
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
@@ -753,7 +1286,7 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
           const Text('Create your journey',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
           const SizedBox(height: 6),
-          const Text('Tell us where you want to go. We will build the trip and open it so other travellers can join and share the cost.',
+          const Text('Tell us where you want to go and which days you are free. We open the trip so other travellers can join, pick days that suit them, then vote on the best departure day.',
               style: TextStyle(color: AppColors.text2, fontSize: 13, height: 1.35)),
           const SizedBox(height: 18),
           const Text('Destination', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -765,16 +1298,12 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
               if (_error != null) setState(() => _error = null);
             },
           ),
-          if (_error != null) ...[
-            const SizedBox(height: 6),
-            Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 12.5)),
-          ],
           const SizedBox(height: 14),
-          const Text('Preferred start date', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const Text('Available date window', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           const SizedBox(height: 6),
           InkWell(
             borderRadius: BorderRadius.circular(kRadius),
-            onTap: _pickDate,
+            onTap: _pickRange,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
@@ -784,26 +1313,13 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.blue),
+                  const Icon(Icons.date_range_rounded, size: 18, color: AppColors.blue),
                   const SizedBox(width: 10),
-                  Text(dateLabel,
-                      style: TextStyle(color: _date == null ? AppColors.text2 : AppColors.text, fontSize: 14)),
+                  Text(rangeLabel,
+                      style: TextStyle(color: _range == null ? AppColors.text2 : AppColors.text, fontSize: 14)),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 14),
-          const Text('Travellers', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _StepBtn(icon: Icons.remove_rounded, onTap: () => setState(() => _pax = (_pax - 1).clamp(1, 20))),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Text('$_pax', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-              ),
-              _StepBtn(icon: Icons.add_rounded, onTap: () => setState(() => _pax = (_pax + 1).clamp(1, 20))),
-            ],
           ),
           const SizedBox(height: 14),
           const Text('Notes (optional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -811,8 +1327,12 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
           TextField(
             controller: _notesCtrl,
             maxLines: 3,
-            decoration: const InputDecoration(hintText: 'Anything you would like to add...'),
+            decoration: const InputDecoration(hintText: 'Places you want to see, budget, anything else...'),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 12.5)),
+          ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -822,8 +1342,10 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              onPressed: _submit,
-              child: const Text('Send my journey request', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              onPressed: _busy ? null : _submit,
+              child: _busy
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Send my journey request', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             ),
           ),
         ],
