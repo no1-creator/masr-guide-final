@@ -31,16 +31,16 @@ const DEMO_NAMES = [
   "Laila", "Hassan", "Dina", "Tarek", "Salma", "Amr", "Yara",
 ]
 const DEMO_TRIPS = [
-  { title: "Giza Pyramids & Sphinx Day Tour", places: "Giza Pyramids, The Egyptian Museum, Cairo", plan: "Full-day guided tour of the Pyramids, the Sphinx and the Grand Egyptian Museum, with lunch by the plateau.", price_small: 2400, price_group: 9000, joined: 6, days: 9 },
-  { title: "Luxor: Valley of the Kings & Karnak", places: "Luxor, Karnak Temple, Valley of the Kings", plan: "Two days exploring the East & West Banks of Luxor — Karnak, Hatshepsut Temple and the royal tombs.", price_small: 3200, price_group: 12000, joined: 4, days: 12 },
-  { title: "Aswan & Abu Simbel Escape", places: "Aswan, Abu Simbel, Philae Temple", plan: "Nubian culture, the High Dam, Philae Temple and an early trip to the great temples of Abu Simbel.", price_small: 3600, price_group: 13500, joined: 7, days: 15, voting: true },
-  { title: "Hurghada Red Sea Getaway", places: "Hurghada, Red Sea", plan: "Three relaxed days on the Red Sea — a snorkeling boat trip, Orange Bay island and free beach time.", price_small: 3000, price_group: 11000, joined: 5, days: 10 },
-  { title: "Sharm El-Sheikh & Ras Mohamed", places: "Sharm El-Sheikh, Ras Mohamed", plan: "Diving and snorkeling in Ras Mohamed National Park plus a desert quad-bike sunset.", price_small: 3400, price_group: 12500, joined: 3, days: 18 },
-  { title: "White Desert & Bahariya Camping", places: "White Desert, Bahariya Oasis", plan: "Overnight desert safari — the White Desert chalk formations, the Black Desert and a Bedouin dinner under the stars.", price_small: 2800, price_group: 10500, joined: 8, days: 7, voting: true },
-  { title: "Siwa Oasis Adventure", places: "Siwa Oasis", plan: "Salt lakes, Cleopatra's spring, the Oracle Temple and dune surfing in the Great Sand Sea.", price_small: 3800, price_group: 14000, joined: 4, days: 20 },
-  { title: "Alexandria Mediterranean Day Trip", places: "Alexandria", plan: "The Bibliotheca, Qaitbay Citadel, the Catacombs and a seafood lunch on the Corniche.", price_small: 2200, price_group: 8500, joined: 6, days: 6 },
-  { title: "Dahab & the Blue Hole", places: "Dahab, Blue Hole", plan: "Laid-back Dahab — snorkeling the Blue Hole, the Colored Canyon and a Bedouin camp evening.", price_small: 3100, price_group: 11500, joined: 5, days: 14 },
-  { title: "Nile Cruise Luxor to Aswan", places: "Nile Cruise, Luxor, Aswan", plan: "Four-night Nile cruise visiting Edfu and Kom Ombo temples between Luxor and Aswan.", price_small: 5200, price_group: 19000, joined: 7, days: 22 },
+  { title: "Giza Pyramids & Sphinx Day Tour", places: "Giza Pyramids, The Egyptian Museum, Cairo", plan: "Full-day guided tour of the Pyramids, the Sphinx and the Grand Egyptian Museum, with lunch by the plateau.", price_small: 180, price_group: 500, joined: 6, days: 9 },
+  { title: "Luxor: Valley of the Kings & Karnak", places: "Luxor, Karnak Temple, Valley of the Kings", plan: "Two days exploring the East & West Banks of Luxor — Karnak, Hatshepsut Temple and the royal tombs.", price_small: 240, price_group: 650, joined: 4, days: 12 },
+  { title: "Aswan & Abu Simbel Escape", places: "Aswan, Abu Simbel, Philae Temple", plan: "Nubian culture, the High Dam, Philae Temple and an early trip to the great temples of Abu Simbel.", price_small: 280, price_group: 750, joined: 7, days: 15, voting: true },
+  { title: "Hurghada Red Sea Getaway", places: "Hurghada, Red Sea", plan: "Three relaxed days on the Red Sea — a snorkeling boat trip, Orange Bay island and free beach time.", price_small: 220, price_group: 600, joined: 5, days: 10 },
+  { title: "Sharm El-Sheikh & Ras Mohamed", places: "Sharm El-Sheikh, Ras Mohamed", plan: "Diving and snorkeling in Ras Mohamed National Park plus a desert quad-bike sunset.", price_small: 260, price_group: 700, joined: 3, days: 18 },
+  { title: "White Desert & Bahariya Camping", places: "White Desert, Bahariya Oasis", plan: "Overnight desert safari — the White Desert chalk formations, the Black Desert and a Bedouin dinner under the stars.", price_small: 210, price_group: 580, joined: 8, days: 7, voting: true },
+  { title: "Siwa Oasis Adventure", places: "Siwa Oasis", plan: "Salt lakes, Cleopatra's spring, the Oracle Temple and dune surfing in the Great Sand Sea.", price_small: 300, price_group: 800, joined: 4, days: 20 },
+  { title: "Alexandria Mediterranean Day Trip", places: "Alexandria", plan: "The Bibliotheca, Qaitbay Citadel, the Catacombs and a seafood lunch on the Corniche.", price_small: 170, price_group: 450, joined: 6, days: 6 },
+  { title: "Dahab & the Blue Hole", places: "Dahab, Blue Hole", plan: "Laid-back Dahab — snorkeling the Blue Hole, the Colored Canyon and a Bedouin camp evening.", price_small: 240, price_group: 640, joined: 5, days: 14 },
+  { title: "Nile Cruise Luxor to Aswan", places: "Nile Cruise, Luxor, Aswan", plan: "Four-night Nile cruise visiting Edfu and Kom Ombo temples between Luxor and Aswan.", price_small: 420, price_group: 1100, joined: 7, days: 22 },
 ]
 
 let READY = false
