@@ -261,8 +261,8 @@ async function api(path,opts={}){
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
 function closeModal(id){document.getElementById(id).classList.remove('on');}
 function openModal(id){document.getElementById(id).classList.add('on');}
-function money(n){return Number(n||0).toLocaleString()+' EGP';}
-function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function money(n){return '$'+Number(n||0).toLocaleString();}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function v(id){return document.getElementById(id).value;}
 
 function renderAuth(){
