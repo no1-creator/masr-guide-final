@@ -72,6 +72,23 @@ class ApiClient {
   Future<Map<String, dynamic>> register(Map<String, dynamic> data) async =>
       Map<String, dynamic>.from(await post('/api/auth/register', data) as Map);
 
+  // ---- New: phone OTP + social sign-in ----
+  Future<Map<String, dynamic>> otpRequest(String phone) async =>
+      Map<String, dynamic>.from(await post('/api/auth/otp/request', {'phone': phone}) as Map);
+  Future<Map<String, dynamic>> otpVerify(String phone, String code, {String? name}) async =>
+      Map<String, dynamic>.from(await post('/api/auth/otp/verify', {
+        'phone': phone,
+        'code': code,
+        if (name != null && name.isNotEmpty) 'name': name,
+      }) as Map);
+  Future<Map<String, dynamic>> googleAuth(String idToken) async =>
+      Map<String, dynamic>.from(await post('/api/auth/google', {'id_token': idToken}) as Map);
+  Future<Map<String, dynamic>> appleAuth(String identityToken, {String? name}) async =>
+      Map<String, dynamic>.from(await post('/api/auth/apple', {
+        'identity_token': identityToken,
+        if (name != null && name.isNotEmpty) 'name': name,
+      }) as Map);
+
   Future<List> bookings() async => await get('/api/bookings') as List;
   Future<Map<String, dynamic>> createBooking(Map<String, dynamic> data) async =>
       Map<String, dynamic>.from(await post('/api/bookings', data) as Map);
