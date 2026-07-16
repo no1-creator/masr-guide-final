@@ -13,11 +13,14 @@ import '../theme.dart';
 //   • Mine    -> GET  /api/group-trips/:id/me      (my membership + available_days)
 //   • Join    -> POST /api/group-trips/:id/join   (seats, name, phone, available_days[])
 //   • Vote    -> POST /api/group-trips/:id/vote   (date)  — members only
+//   • Pay     -> POST /api/group-trips/:id/pay    — lock a seat during the pay window
+//   • Leave   -> POST /api/group-trips/:id/leave  — release a seat for others
 //
-// The creator picks a DATE WINDOW they are available. Everyone who joins picks
-// which days within that window suits them. Only members vote — and only on the
-// days they said they're available for. When the endpoint isn't reachable the
-// screen still falls back to the built-in demo trips (offline-first).
+// Capacity lifecycle: a trip fills up (filling) → reaches the minimum (ready,
+// still joinable) → fills to the max (full = "Complete") → a day is confirmed
+// (payment window opens) → members pay to lock their seats; unpaid seats are
+// released automatically. When the endpoint isn't reachable the screen falls
+// back to the built-in demo trips (offline-first).
 // =============================================================================
 
 num _num(dynamic v) => v is num ? v : num.tryParse('${v ?? ''}') ?? 0;
@@ -72,6 +75,49 @@ String _statusLabel(String s) {
   }
 }
 
+/// Human label for the shared capacity "phase" returned by the backend.
+String _phaseLabel(String phase) {
+  switch (phase) {
+    case 'full':
+      return 'Complete';
+    case 'confirmed':
+      return 'Confirmed';
+    case 'ready':
+      return 'Ready';
+    case 'filling':
+      return 'Filling up';
+    case 'preparing':
+      return 'Preparing';
+    case 'completed':
+      return 'Completed';
+    case 'closed':
+      return 'Closed';
+    default:
+      return 'Open';
+  }
+}
+
+// Small pill used on the compact home cards.
+Widget _cardBadge(String text, Color color) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(text,
+          style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.5)),
+    );
+
+// Status chip used on the wide "browse" cards.
+Widget _statusChip(String text, Color color) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w700)),
+    );
+
 class GroupTrip {
   final int id; // 0 = demo / offline
   final String name;
@@ -79,10 +125,19 @@ class GroupTrip {
   final int daysLeft;
   final int joined;
   final int minGroup;
+  final int maxGroup;
   final bool vote;
   final String status;
+  final String phase;
+  final bool isFull;
+  final bool canJoin;
+  final bool payOpen;
+  final bool minReached;
+  final int spotsToMax;
   final String? dateFrom;
   final String? dateTo;
+  final String? finalDate;
+  final String? payDeadline;
   final String itinerary;
 
   const GroupTrip({
@@ -92,10 +147,19 @@ class GroupTrip {
     required this.joined,
     this.id = 0,
     this.minGroup = 10,
+    this.maxGroup = 14,
     this.vote = false,
     this.status = '',
+    this.phase = '',
+    this.isFull = false,
+    this.canJoin = false,
+    this.payOpen = false,
+    this.minReached = false,
+    this.spotsToMax = 0,
     this.dateFrom,
     this.dateTo,
+    this.finalDate,
+    this.payDeadline,
     this.itinerary = '',
   });
 
@@ -103,6 +167,25 @@ class GroupTrip {
     if (minGroup <= 0) return 0;
     final p = joined / minGroup;
     return p < 0 ? 0 : (p > 1 ? 1 : p);
+  }
+
+  // Progress fills toward the minimum while filling, then toward the max once
+  // the minimum is reached (so "ready" trips keep showing they have room).
+  double get progressBar {
+    if (minReached && maxGroup > 0) {
+      final p = joined / maxGroup;
+      return p < 0 ? 0 : (p > 1 ? 1 : p);
+    }
+    return progress;
+  }
+
+  // Short status shown on the compact cards.
+  String get tileStatus {
+    if (isFull || phase == 'full') return 'Complete';
+    if (phase == 'confirmed') return 'Confirmed';
+    if (minReached) return spotsToMax > 0 ? '$spotsToMax seats left' : 'Complete';
+    final need = minGroup - joined;
+    return need > 0 ? '$need spots left' : 'Ready';
   }
 
   static String _mainPlace(String itinerary, String fallback) {
@@ -126,6 +209,8 @@ class GroupTrip {
     final itinerary = '${j['itinerary_text'] ?? ''}';
     final title = '${j['title'] ?? j['name'] ?? j['destination'] ?? ''}'.trim();
     final status = '${j['status'] ?? ''}';
+    final maxGroup = _num(j['max_people'] ?? j['max_group'] ?? 14).toInt();
+    final joined = _num(j['members_count'] ?? j['joined'] ?? j['members'] ?? 0).toInt();
     return GroupTrip(
       id: _num(j['id']).toInt(),
       name: title.isNotEmpty ? title : _mainPlace(itinerary, 'Group trip'),
@@ -136,12 +221,21 @@ class GroupTrip {
           j['usd'] ??
           0),
       daysLeft: _daysLeftFrom(j),
-      joined: _num(j['members_count'] ?? j['joined'] ?? j['members'] ?? 0).toInt(),
+      joined: joined,
       minGroup: _num(j['min_people'] ?? j['min_group'] ?? 10).toInt(),
+      maxGroup: maxGroup,
       vote: status == 'voting' || j['vote'] == true || j['voting'] == true,
       status: status,
+      phase: '${j['phase'] ?? ''}',
+      isFull: j['is_full'] == true,
+      canJoin: j['can_join'] == true,
+      payOpen: j['pay_open'] == true,
+      minReached: j['min_reached'] == true,
+      spotsToMax: _num(j['spots_to_max'] ?? (maxGroup - joined)).toInt(),
       dateFrom: j['date_from']?.toString(),
       dateTo: j['date_to']?.toString(),
+      finalDate: j['final_date']?.toString(),
+      payDeadline: j['pay_deadline']?.toString(),
       itinerary: itinerary,
     );
   }
@@ -323,6 +417,7 @@ class _TripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final full = trip.isFull || trip.phase == 'full';
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -330,10 +425,12 @@ class _TripCard extends StatelessWidget {
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(13),
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1B5163), AppColors.blueHover],
+            colors: full
+                ? const [Color(0xFF2E8B7B), Color(0xFF186B5C)]
+                : const [Color(0xFF1B5163), AppColors.blueHover],
           ),
         ),
         child: Column(
@@ -351,16 +448,12 @@ class _TripCard extends StatelessWidget {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11.5)),
                 ),
                 const Spacer(),
-                if (trip.vote)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.16),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text('VOTE',
-                        style: TextStyle(color: Color(0xFFFFD9A8), fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.5)),
-                  ),
+                if (full)
+                  _cardBadge('FULL', const Color(0xFFCFFBEF))
+                else if (trip.phase == 'confirmed')
+                  _cardBadge('CONFIRMED', const Color(0xFFCFFBEF))
+                else if (trip.vote)
+                  _cardBadge('VOTE', const Color(0xFFFFD9A8)),
               ],
             ),
             const SizedBox(height: 9),
@@ -374,7 +467,7 @@ class _TripCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
-                value: trip.progress,
+                value: trip.progressBar,
                 minHeight: 4,
                 backgroundColor: Colors.white24,
                 valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
@@ -385,13 +478,14 @@ class _TripCard extends StatelessWidget {
               children: [
                 const Icon(Icons.group_rounded, size: 12, color: Color(0xFFDCE6E9)),
                 const SizedBox(width: 3),
-                Text('${trip.joined}/${trip.minGroup}',
+                Text('${trip.joined}/${full ? trip.maxGroup : trip.minGroup}',
                     style: const TextStyle(color: Color(0xFFDCE6E9), fontSize: 10.5, fontWeight: FontWeight.w600)),
                 const Spacer(),
-                const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFFDCE6E9)),
-                const SizedBox(width: 3),
-                Text('${trip.daysLeft}d',
-                    style: const TextStyle(color: Color(0xFFDCE6E9), fontSize: 10.5, fontWeight: FontWeight.w600)),
+                Flexible(
+                  child: Text(trip.tileStatus,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFFFFD9A8), fontSize: 10.5, fontWeight: FontWeight.w700)),
+                ),
               ],
             ),
           ],
@@ -468,6 +562,7 @@ class _TripWideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final full = trip.isFull || trip.phase == 'full';
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(kRadius),
@@ -502,7 +597,7 @@ class _TripWideCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                       const SizedBox(height: 3),
-                      Text('${trip.joined} of ${trip.minGroup} joined · ${trip.daysLeft} days left',
+                      Text('${trip.joined} of ${full ? trip.maxGroup : trip.minGroup} joined · ${trip.daysLeft} days left',
                           style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
                     ],
                   ),
@@ -521,7 +616,7 @@ class _TripWideCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
-                value: trip.progress,
+                value: trip.progressBar,
                 minHeight: 6,
                 backgroundColor: AppColors.soft,
                 valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
@@ -530,16 +625,14 @@ class _TripWideCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                if (trip.vote)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.orange.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text('Voting on dates',
-                        style: TextStyle(color: AppColors.orange, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  ),
+                if (full)
+                  _statusChip('Complete', AppColors.green)
+                else if (trip.phase == 'confirmed')
+                  _statusChip('Confirmed', AppColors.green)
+                else if (trip.vote)
+                  _statusChip('Voting on dates', AppColors.orange)
+                else if (trip.minReached)
+                  _statusChip('${trip.spotsToMax} seats left', AppColors.green),
                 const Spacer(),
                 const Text('View details',
                     style: TextStyle(color: AppColors.blue, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -554,7 +647,7 @@ class _TripWideCard extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Trip detail bottom sheet (join / vote) — live backend + demo fallback.
+// Trip detail bottom sheet (join / vote / pay / cancel) — live backend + demo.
 // -----------------------------------------------------------------------------
 void openTripDetail(BuildContext context, GroupTrip trip) {
   showModalBottomSheet<void>(
@@ -642,12 +735,13 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
     }
   }
 
-  Future<void> _join(List<String> rangeDays) async {
+  Future<void> _join(List<String> rangeDays, {String? fixedDay}) async {
     if (!_app.isLoggedIn) {
       _snack('Log in from the Account tab to join this trip.');
       return;
     }
-    if (rangeDays.isNotEmpty && _joinDays.isEmpty) {
+    final days = fixedDay != null ? <String>[fixedDay] : (_joinDays.toList()..sort());
+    if (fixedDay == null && rangeDays.isNotEmpty && _joinDays.isEmpty) {
       _snack('Please choose at least one day you are available.');
       return;
     }
@@ -657,7 +751,6 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
     }
     setState(() => _busy = true);
     try {
-      final days = _joinDays.toList()..sort();
       await _app.api.post('/api/group-trips/${widget.trip.id}/join', {
         'seats': _joinSeats,
         'name': _joinName.text.trim(),
@@ -665,7 +758,7 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
         'available_days': days,
       });
       await _load();
-      _snack('You joined the trip! You can vote on a day once voting opens.');
+      _snack('You joined the trip!');
     } catch (e) {
       _snack(e is ApiException ? e.message : 'Could not join. Please try again.');
     } finally {
@@ -688,6 +781,52 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  // Pay to lock the seat (Phase A). A real gateway plugs into this same step.
+  Future<void> _pay() async {
+    if (!_app.isLoggedIn) {
+      _snack('Log in from the Account tab to pay.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await _app.api.post('/api/group-trips/${widget.trip.id}/pay', {});
+      await _load();
+      _snack('Payment recorded — your seat is confirmed!');
+    } catch (e) {
+      _snack(e is ApiException ? e.message : 'Could not process the payment.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _leave() async {
+    setState(() => _busy = true);
+    try {
+      await _app.api.post('/api/group-trips/${widget.trip.id}/leave', {});
+      await _load();
+      _snack('Your seat was cancelled.');
+    } catch (e) {
+      _snack(e is ApiException ? e.message : 'Could not cancel your seat.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmLeave() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Cancel your seat?'),
+        content: const Text('Your seat will be released so another traveller can take it.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Keep my seat')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Cancel seat')),
+        ],
+      ),
+    );
+    if (ok == true) _leave();
   }
 
   @override
@@ -731,23 +870,40 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
     final candidateDays = (_detail?['candidate_days'] as List?) ?? const [];
     final member = _me?['member'] as Map?;
     final isMember = member != null;
+    final memberStatus = '${member?['status'] ?? ''}';
     final myAvailable = <String>[
       ...((member?['available_days'] as List?)?.map((e) => '$e') ?? const [])
     ];
     final myVote = member?['vote_date'] == null ? null : '${member!['vote_date']}';
 
     final status = '${t['status'] ?? trip.status}';
+    final phase = '${t['phase'] ?? trip.phase}';
     final dateFrom = t['date_from']?.toString() ?? trip.dateFrom;
     final dateTo = t['date_to']?.toString() ?? trip.dateTo;
+    final finalDate = t['final_date']?.toString() ?? trip.finalDate;
     final joined = _num(t['members_count'] ?? trip.joined).toInt();
     final minGroup = _num(t['min_people'] ?? trip.minGroup).toInt();
+    final maxGroup = _num(t['max_people'] ?? trip.maxGroup).toInt();
     final price = _num(t['current_per_person'] ??
         t['small_per_person'] ??
         t['price_small'] ??
         trip.priceUsd);
-    final progress = minGroup <= 0 ? 0.0 : (joined / minGroup).clamp(0.0, 1.0);
+    final isFull = t['is_full'] == true || phase == 'full';
+    final canJoin = t['can_join'] == true;
+    final payOpen = t['pay_open'] == true;
+    final minReached = t['min_reached'] == true;
+    final spotsToMax = _num(t['spots_to_max'] ?? (maxGroup - joined)).toInt();
+    final progress = (minReached && maxGroup > 0)
+        ? (joined / maxGroup).clamp(0.0, 1.0)
+        : (minGroup <= 0 ? 0.0 : (joined / minGroup).clamp(0.0, 1.0));
     final rangeDays = _daysBetween(dateFrom, dateTo);
-    final showVoting = status == 'voting' || candidateDays.isNotEmpty;
+    final showVoting = status == 'voting';
+
+    final progressText = isFull
+        ? 'Group is complete — $joined travellers on board.'
+        : minReached
+            ? 'Confirmed \u2713 — $spotsToMax more seat(s) still available.'
+            : '${(minGroup - joined).clamp(0, minGroup)} more travellers needed to confirm this trip.';
 
     return ListView(
       controller: scroll,
@@ -775,9 +931,9 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
         const SizedBox(height: 16),
         Row(
           children: [
-            _StatBox(icon: Icons.group_rounded, label: 'Joined', value: '$joined/$minGroup'),
+            _StatBox(icon: Icons.group_rounded, label: 'Joined', value: '$joined/${isFull || minReached ? maxGroup : minGroup}'),
             const SizedBox(width: 10),
-            _StatBox(icon: Icons.flag_rounded, label: 'Status', value: _statusLabel(status)),
+            _StatBox(icon: Icons.flag_rounded, label: 'Status', value: phase.isNotEmpty ? _phaseLabel(phase) : _statusLabel(status)),
           ],
         ),
         const SizedBox(height: 16),
@@ -791,8 +947,7 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
           ),
         ),
         const SizedBox(height: 6),
-        Text('${(minGroup - joined).clamp(0, minGroup)} more travellers needed to confirm this trip.',
-            style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
+        Text(progressText, style: const TextStyle(color: AppColors.text2, fontSize: 12.5)),
         if (dateFrom != null && dateTo != null) ...[
           const SizedBox(height: 14),
           Row(
@@ -802,6 +957,19 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
               Expanded(
                 child: Text('Available window: ${_prettyDate(dateFrom)} – ${_prettyDate(dateTo)}',
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+              ),
+            ],
+          ),
+        ],
+        if (finalDate != null) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.event_available_rounded, size: 18, color: AppColors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Departure date: ${_prettyDate(finalDate)}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.green)),
               ),
             ],
           ),
@@ -820,7 +988,7 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
               ),
             )),
 
-        // ----- Voting (members only) -----
+        // ----- Voting (members only, during the voting phase) -----
         if (showVoting) ...[
           const SizedBox(height: 20),
           const Text('Vote on the departure date',
@@ -877,8 +1045,8 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
 
         const SizedBox(height: 20),
 
-        // ----- Join / membership -----
-        if (isMember)
+        // ----- Membership / join / pay / cancel -----
+        if (isMember) ...[
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -890,10 +1058,11 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  children: const [
-                    Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
-                    SizedBox(width: 8),
-                    Text("You're in this trip", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Text(memberStatus == 'paid' ? 'Your seat is confirmed (paid)' : "You're in this trip",
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                   ],
                 ),
                 if (myAvailable.isNotEmpty) ...[
@@ -903,42 +1072,82 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
                 ],
               ],
             ),
-          )
-        else if (!_app.isLoggedIn)
-          _noteBox('Log in from the Account tab to join this trip and pick your available days.')
-        else if (status == 'open') ...[
-          const Text('Choose the days you can travel',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          const SizedBox(height: 4),
-          const Text('Pick every day within the window that works for you. We use these to find the best departure day.',
-              style: TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
-          const SizedBox(height: 10),
-          if (rangeDays.isEmpty)
-            _noteBox('The organiser has not set a date window yet.')
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: rangeDays.map((d) {
-                final sel = _joinDays.contains(d);
-                return GestureDetector(
-                  onTap: () => setState(() => sel ? _joinDays.remove(d) : _joinDays.add(d)),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: sel ? AppColors.blue : AppColors.soft,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: sel ? AppColors.blue : AppColors.border),
-                    ),
-                    child: Text(_prettyDate(d),
-                        style: TextStyle(
-                            color: sel ? Colors.white : AppColors.text,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12.5)),
-                  ),
-                );
-              }).toList(),
+          ),
+          if (phase == 'confirmed' && payOpen && memberStatus != 'paid') ...[
+            const SizedBox(height: 12),
+            _noteBox('The departure date is set. Pay now to lock your seat — unpaid seats are released so others can join.'),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+                onPressed: _busy ? null : _pay,
+                child: _busy
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Pay now to lock your seat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
             ),
+          ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.red,
+                side: const BorderSide(color: AppColors.border),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              onPressed: _busy ? null : _confirmLeave,
+              child: const Text('Cancel my seat', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ] else if (!_app.isLoggedIn)
+          _noteBox('Log in from the Account tab to join this trip and pick your available days.')
+        else if (canJoin) ...[
+          if (finalDate != null) ...[
+            const Text('Join this trip',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text('The departure date is set: ${_prettyDate(finalDate)}. Join now, then pay to lock your seat.',
+                style: const TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
+          ] else ...[
+            const Text('Choose the days you can travel',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 4),
+            const Text('Pick every day within the window that works for you. We use these to find the best departure day.',
+                style: TextStyle(color: AppColors.text2, fontSize: 12.5, height: 1.3)),
+            const SizedBox(height: 10),
+            if (rangeDays.isEmpty)
+              _noteBox('The organiser has not set a date window yet.')
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: rangeDays.map((d) {
+                  final sel = _joinDays.contains(d);
+                  return GestureDetector(
+                    onTap: () => setState(() => sel ? _joinDays.remove(d) : _joinDays.add(d)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? AppColors.blue : AppColors.soft,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: sel ? AppColors.blue : AppColors.border),
+                      ),
+                      child: Text(_prettyDate(d),
+                          style: TextStyle(
+                              color: sel ? Colors.white : AppColors.text,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5)),
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
           const SizedBox(height: 16),
           const Text('Seats', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           const SizedBox(height: 6),
@@ -969,13 +1178,15 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              onPressed: _busy ? null : () => _join(rangeDays),
+              onPressed: _busy ? null : () => _join(rangeDays, fixedDay: finalDate),
               child: _busy
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Join this trip', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             ),
           ),
-        ] else
+        ] else if (isFull)
+          _noteBox('This trip is complete — the group is full. Check back in case a seat opens up.')
+        else
           _noteBox('This trip is no longer open for new members.'),
 
         if (_error != null) ...[
