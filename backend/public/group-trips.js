@@ -33,6 +33,24 @@
       ? Math.min(100, Math.round((t.members_count / t.min_people) * 100))
       : 0
   }
+  // Progress fills toward the MINIMUM while filling, then toward the MAX once
+  // the minimum is reached (so "ready" trips keep showing they have room).
+  function progressPct(t) {
+    if (t.min_reached && t.max_people)
+      return Math.min(100, Math.round((t.members_count / t.max_people) * 100))
+    return pctOf(t)
+  }
+  // Shared short status shown on the small cards.
+  function tileStatus(t) {
+    if (t.is_full || t.phase === "full") return "Complete \u2713"
+    if (t.phase === "confirmed") return "Confirmed \u2713"
+    if (t.min_reached) {
+      var s = t.spots_to_max || 0
+      return s > 0 ? "\u2713 " + s + " seats left" : "Complete \u2713"
+    }
+    var need = t.spots_left || 0
+    return need > 0 ? need + " spots left" : "Ready \u2713"
+  }
 
   // ---- date + voting + whatsapp helpers ----
   var JDAYS = {}
@@ -149,7 +167,7 @@
         name +
         '! Good news — the group for "' +
         title +
-        '" is complete 🎉 Open RaGo to vote on the final date: ' +
+        '" reached the minimum 🎉 Open RaGo to vote on the final date: ' +
         tripUrl(trip)
       )
     if (trip && trip.final_date)
@@ -242,18 +260,21 @@
   }
 
   function tripCard(t) {
-    var pct = pctOf(t)
+    var pct = progressPct(t)
     var joined = t.members_count || 0
     var min = t.min_people || 0
-    var left = Math.max(0, min - joined)
     var pp = t.current_per_person != null ? money(t.current_per_person) : null
+    var full = t.is_full || t.phase === "full"
     return (
       '<div class="gt-cardwrap">' +
-      '<div class="gt-tile" onclick="GT.openTrip(' +
+      '<div class="gt-tile' +
+      (full ? " gt-full" : "") +
+      '" onclick="GT.openTrip(' +
       t.id +
       ')">' +
       '<div class="gt-tile-top">' +
       (pp ? '<span class="gt-price">' + pp + "</span>" : "") +
+      (full ? '<span class="gt-badge">Complete</span>' : "") +
       "</div>" +
       '<div class="gt-tile-mid"><span class="gt-count">' +
       joined +
@@ -264,7 +285,7 @@
       pct +
       '%"></div></div>' +
       '<div class="gt-tile-left">' +
-      (left > 0 ? left + " spots left" : "Confirmed \u2713") +
+      esc(tileStatus(t)) +
       "</div>" +
       "</div>" +
       '<div class="gt-place-lbl" title="' +
@@ -386,9 +407,20 @@
       var r = await api("/api/group-trips/" + id)
       var t = r.trip,
         members = r.members || []
-      var pct = pctOf(t)
+      var pct = progressPct(t)
       var isCreator = loggedIn() && USER && t.creator_id === USER.id
       var shareUrl = location.origin + location.pathname + "?trip=" + t.id
+
+      // My membership on this trip (drives join / pay / cancel state).
+      var mine = null
+      if (loggedIn()) {
+        try {
+          var me = await api("/api/group-trips/" + id + "/me")
+          mine = me.member
+        } catch (e) {}
+      }
+      var isMember = !!mine
+
       var priceBlock =
         t.current_per_person != null
           ? '<div class="price" style="font-size:26px">' +
@@ -403,30 +435,60 @@
                 " travellers join</div>"
               : "")
           : '<div class="muted">Awaiting price from our team</div>'
-      var joinBtn =
-        t.status === "open"
-          ? '<button class="btn" style="width:100%;margin-top:12px" onclick="GT.openJoin(' +
+
+      // Primary action for people who have NOT joined yet.
+      var actionBtn = ""
+      if (!isMember) {
+        if (t.can_join)
+          actionBtn =
+            '<button class="btn" style="width:100%;margin-top:12px" onclick="GT.openJoin(' +
             t.id +
             ')">Join this trip</button>'
-          : '<div class="tag ' +
+        else if (t.is_full || t.phase === "full")
+          actionBtn =
+            '<div class="tag" style="margin-top:12px;display:inline-block;background:#2E8B7B;color:#fff">Complete \u2713 — group is full</div>'
+        else
+          actionBtn =
+            '<div class="tag ' +
             esc(t.status) +
             '" style="margin-top:12px;display:inline-block">' +
             esc(t.status) +
             "</div>"
+      }
+
+      // Member-only block: pay window / paid / joined + cancel my seat.
+      var memberBlock = ""
+      if (isMember) {
+        if (t.phase === "confirmed" && t.pay_open && mine.status !== "paid") {
+          memberBlock +=
+            '<button class="btn" style="width:100%;margin-top:12px;background:#E8850F" onclick="GT.payMine(' +
+            t.id +
+            ')">Pay now to lock your seat</button>' +
+            '<div class="muted" style="font-size:12px;margin-top:6px">Payment closes in ' +
+            esc(countdown(t.pay_deadline)) +
+            " · unpaid seats are released.</div>"
+        } else if (mine.status === "paid") {
+          memberBlock +=
+            '<div class="tag" style="margin-top:12px;display:inline-block;background:#2E8B7B;color:#fff">\u2713 Paid — your seat is confirmed</div>'
+        } else {
+          memberBlock +=
+            '<div class="tag" style="margin-top:12px;display:inline-block;background:#123B4C;color:#fff">\u2713 You joined this trip</div>'
+        }
+        memberBlock +=
+          '<div><button class="btn ghost sm" style="margin-top:8px" onclick="GT.leave(' +
+          t.id +
+          ')">Cancel my seat</button></div>'
+      }
+
       var acceptBtn =
         isCreator && t.status === "quoted"
           ? '<button class="btn" style="width:100%;margin-top:8px;background:var(--green)" onclick="GT.accept(' +
             t.id +
-            ')">Accept quote &amp; open trip</button>'
+            ')">Accept quote & open trip</button>'
           : ""
       var cands = r.candidate_days || []
       var voteBlock = ""
       if (t.status === "voting") {
-        var mine = null
-        try {
-          var me = await api("/api/group-trips/" + id + "/me")
-          mine = me.member
-        } catch (e) {}
         voteBlock = buildVoteBlock(t, cands, mine)
       }
       var finalBlock = t.final_date
@@ -434,6 +496,19 @@
           fmtDay(t.final_date) +
           "</div>"
         : ""
+
+      // Phase-aware progress line.
+      var progressText =
+        t.is_full || t.phase === "full"
+          ? "Group is complete \u2014 " + t.members_count + " travellers"
+          : t.min_reached
+            ? "Confirmed \u2713 — " +
+              (t.spots_to_max || 0) +
+              " more seat(s) still available"
+            : (t.spots_left || 0) > 0
+              ? t.spots_left + " more travellers needed to confirm"
+              : "Minimum reached \u2014 trip confirmed!"
+
       var body = document.getElementById("detail-body")
       body.innerHTML =
         '<div class="two"><div>' +
@@ -450,7 +525,7 @@
         "/" +
         (t.min_people || "?") +
         " joined</div>" +
-        '<div class="box" style="margin-top:14px"><b>Trip plan &amp; places to visit</b><div style="white-space:pre-wrap;margin-top:6px">' +
+        '<div class="box" style="margin-top:14px"><b>Trip plan & places to visit</b><div style="white-space:pre-wrap;margin-top:6px">' +
         esc(t.itinerary_text || "") +
         "</div></div>" +
         '<div class="box" style="margin-top:14px"><b>Travellers (' +
@@ -474,17 +549,14 @@
         pct +
         '%;background:var(--green)"></div></div>' +
         '<div class="muted" style="font-size:13px">' +
-        (t.spots_left != null
-          ? t.spots_left > 0
-            ? t.spots_left + " more travellers needed to confirm"
-            : "Minimum reached — trip confirmed!"
-          : "") +
+        progressText +
         "</div>" +
-        joinBtn +
+        actionBtn +
+        memberBlock +
         acceptBtn +
         voteBlock +
         finalBlock +
-        '<div style="margin-top:16px"><b style="font-size:13px">Share &amp; invite</b>' +
+        '<div style="margin-top:16px"><b style="font-size:13px">Share & invite</b>' +
         '<div class="linkbox"><input id="gt-share" value="' +
         esc(shareUrl) +
         '" readonly><button class="btn ghost sm" onclick="GT.copyShare()">Copy</button></div>' +
@@ -517,20 +589,32 @@
     try {
       var r = await api("/api/group-trips/" + id)
       var t = (r && r.trip) || {}
-      var days = daysBetween(t.date_from, t.date_to)
-      box.innerHTML = days.length
-        ? days
-            .map(function (d) {
-              return (
-                '<span class="gt-day" data-d="' +
-                d +
-                '" onclick="GT.toggleDay(this)">' +
-                fmtDay(d) +
-                "</span>"
-              )
-            })
-            .join("")
-        : '<span class="muted" style="font-size:12px">No specific dates set — you can just join.</span>'
+      if (t.final_date) {
+        // Day already decided — join for the confirmed date (no picking).
+        box.innerHTML =
+          '<span class="gt-day gt-on" data-d="' +
+          t.final_date +
+          '">' +
+          fmtDay(t.final_date) +
+          " (confirmed date)</span>"
+        JDAYS = {}
+        JDAYS[t.final_date] = 1
+      } else {
+        var days = daysBetween(t.date_from, t.date_to)
+        box.innerHTML = days.length
+          ? days
+              .map(function (d) {
+                return (
+                  '<span class="gt-day" data-d="' +
+                  d +
+                  '" onclick="GT.toggleDay(this)">' +
+                  fmtDay(d) +
+                  "</span>"
+                )
+              })
+              .join("")
+          : '<span class="muted" style="font-size:12px">No specific dates set — you can just join.</span>'
+      }
     } catch (e) {
       box.innerHTML =
         '<span class="muted" style="font-size:12px">Could not load dates.</span>'
@@ -560,6 +644,31 @@
       })
       closeModal("gt-join-modal")
       toast("You joined the trip!")
+      openTrip(id)
+      loadOpen()
+    } catch (e) {
+      toast(e.message)
+    }
+  }
+
+  // Member pays to lock their seat (Phase A). A real gateway plugs in here later.
+  async function payMine(id) {
+    try {
+      await api("/api/group-trips/" + id + "/pay", { method: "POST" })
+      toast("Payment recorded — your seat is confirmed!")
+      openTrip(id)
+      loadOpen()
+    } catch (e) {
+      toast(e.message)
+    }
+  }
+
+  // Member cancels their seat; it is released immediately for anyone else.
+  async function leave(id) {
+    if (!confirm("Cancel your seat on this trip?")) return
+    try {
+      await api("/api/group-trips/" + id + "/leave", { method: "POST" })
+      toast("Your seat was cancelled")
       openTrip(id)
       loadOpen()
     } catch (e) {
@@ -621,8 +730,8 @@
       '<div class="field"><label>WhatsApp number</label><input id="gtj-phone" placeholder="+20 1x xxxx xxxx"></div>' +
       '<div class="field"><label>Seats</label><input id="gtj-seats" type="number" min="1" value="1"></div>' +
       '<div class="field"><label>Which days work for you?</label><div id="gtj-days" class="gt-places"></div></div>' +
-      '<div class="muted" style="font-size:13px;margin-bottom:12px">Pick the days you\u2019re available from the range. When the group fills up we\u2019ll vote on the final date, then arrange payment. We\u2019ll notify you on WhatsApp.</div>' +
-      '<div class="row"><button class="btn" onclick="GT.submitJoin()">Confirm &amp; join</button><button class="btn ghost" onclick="closeModal(\'gt-join-modal\')">Cancel</button></div>' +
+      '<div class="muted" style="font-size:13px;margin-bottom:12px">Pick the days you\u2019re available from the range. When the group fills up we\u2019ll vote on the final date, then you pay to lock your seat. We\u2019ll notify you on WhatsApp.</div>' +
+      '<div class="row"><button class="btn" onclick="GT.submitJoin()">Confirm & join</button><button class="btn ghost" onclick="closeModal(\'gt-join-modal\')">Cancel</button></div>' +
       "</div></div>"
     document.body.appendChild(wrap)
   }
@@ -697,6 +806,13 @@
         '>Enabled</option><option value="0"' +
         (!s.enabled ? " selected" : "") +
         ">Disabled</option></select></div></div>" +
+        '<div class="row">' +
+        '<div class="field"><label>Payment window (hours after date set)</label><input id="gts-pay" type="number" value="' +
+        (s.pay_hours != null ? s.pay_hours : 24) +
+        '"></div>' +
+        '<div class="field"><label>Cancellation cutoff (hours before trip)</label><input id="gts-cancel" type="number" value="' +
+        (s.cancel_hours != null ? s.cancel_hours : 72) +
+        '"></div></div>' +
         '<button class="btn" onclick="GT.saveSettings()">Save rules</button></div>'
       : ""
     var rows = trips.map(function (t) {
@@ -804,6 +920,9 @@
           (trip.vote_deadline && trip.status === "voting"
             ? " · Voting closes in " + esc(countdown(trip.vote_deadline))
             : "") +
+          (trip.status === "confirmed" && trip.pay_deadline
+            ? " · Payment closes in " + esc(countdown(trip.pay_deadline))
+            : "") +
           "</div>"
         : ""
       var candBlock = cands.length
@@ -889,6 +1008,8 @@
       deadline_days: Number(v("gts-dl")),
       refund_hours: Number(v("gts-refund")),
       vote_hours: Number(v("gts-vote")),
+      pay_hours: Number(v("gts-pay")),
+      cancel_hours: Number(v("gts-cancel")),
       enabled: v("gts-en") === "1",
     }
     try {
@@ -951,14 +1072,17 @@
       ".gt-cardwrap{flex:0 0 150px;scroll-snap-align:start}" +
       ".gt-tile{position:relative;height:120px;border-radius:14px;background:linear-gradient(150deg,#1B5163,#0E2E3B);box-shadow:0 10px 24px rgba(0,0,0,.22);cursor:pointer;color:#fff;padding:12px;display:flex;flex-direction:column;justify-content:space-between;border:2px solid rgba(255,255,255,.65);transition:.15s}" +
       ".gt-tile:hover{transform:translateY(-3px)}" +
-      ".gt-tile-top{display:flex;justify-content:flex-end;min-height:18px}" +
+      ".gt-tile.gt-full{background:linear-gradient(150deg,#2E8B7B,#186B5C)}" +
+      ".gt-tile-top{display:flex;justify-content:space-between;align-items:flex-start;min-height:18px;gap:6px}" +
       ".gt-price{background:#E8850F;color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px}" +
+      ".gt-badge{background:#fff;color:#186B5C;font-weight:800;font-size:10px;padding:2px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}" +
       ".gt-tile-mid{text-align:center}" +
       ".gt-count{font-size:26px;font-weight:800;line-height:1;display:block}" +
       ".gt-countlbl{font-size:10px;opacity:.8;text-transform:uppercase;letter-spacing:.06em}" +
       ".gt-tile-bar{background:rgba(255,255,255,.25);border-radius:999px;height:5px;overflow:hidden;margin:4px 0 2px}" +
       ".gt-tile-bar>div{height:100%;background:#E8850F}" +
       ".gt-tile-left{font-size:11px;font-weight:600;color:#FFD9A8;text-align:center}" +
+      ".gt-full .gt-tile-left{color:#Eafff8}" +
       ".gt-place-lbl{margin-top:8px;text-align:center;font-size:12px;font-weight:600;color:#123B4C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}" +
       ".gt-arrow{position:absolute;top:44px;z-index:4;width:32px;height:32px;border-radius:50%;border:none;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.2);cursor:pointer;font-size:18px;line-height:1;color:#123B4C}" +
       ".gt-places{display:flex;flex-wrap:wrap;gap:8px;max-height:170px;overflow-y:auto;padding:4px 2px}" +
@@ -987,6 +1111,8 @@
     openTrip: openTrip,
     openJoin: openJoin,
     submitJoin: submitJoin,
+    payMine: payMine,
+    leave: leave,
     accept: accept,
     copyShare: copyShare,
     scrollToOpen: scrollToOpen,
