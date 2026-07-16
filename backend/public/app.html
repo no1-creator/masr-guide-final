@@ -304,12 +304,37 @@ function money(n){return '$'+Number(n||0).toLocaleString();}
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function v(id){return document.getElementById(id).value;}
 
+let AUTH_METHOD='email', OTP_PHONE='';
+
 function renderAuth(){
   const chip=document.getElementById('user-chip'),lb=document.getElementById('login-btn'),db=document.getElementById('dash-btn');
-  if(USER){chip.innerHTML=`<span class="chip">${esc(USER.name||USER.email)} &middot; ${USER.role}</span>`;lb.textContent='Log out';lb.onclick=logout;db.classList.toggle('hidden',USER.role==='customer');}
+  if(USER){chip.innerHTML=`<span class="chip">${esc(USER.name||USER.email)} · ${USER.role}</span>`;lb.textContent='Log out';lb.onclick=logout;db.classList.toggle('hidden',USER.role==='customer');}
   else{chip.innerHTML='';lb.textContent='Log in';lb.onclick=openLogin;db.classList.add('hidden');}
 }
-function openLogin(){setLoginMode('login');openModal('login-modal');}
+
+function openLogin(){
+  setLoginMode('login');
+  setAuthMethod('email');
+  // reset phone state
+  document.getElementById('ph-code-wrap').classList.add('hidden');
+  document.getElementById('ph-verify').classList.add('hidden');
+  document.getElementById('ph-send').classList.remove('hidden');
+  document.getElementById('ph-hint').textContent='';
+  const pn=document.getElementById('ph-number'),pc=document.getElementById('ph-code'),pnm=document.getElementById('ph-name');
+  if(pn)pn.value='';if(pc)pc.value='';if(pnm)pnm.value='';
+  openModal('login-modal');
+}
+
+// Switch between Email and Phone tabs
+function setAuthMethod(m){
+  AUTH_METHOD=m;
+  document.getElementById('auth-email').classList.toggle('hidden',m!=='email');
+  document.getElementById('auth-phone').classList.toggle('hidden',m!=='phone');
+  const te=document.getElementById('tab-email'),tp=document.getElementById('tab-phone');
+  te.style.background=(m==='email')?'var(--blue)':'var(--soft2)';te.style.color=(m==='email')?'#fff':'var(--text)';
+  tp.style.background=(m==='phone')?'var(--blue)':'var(--soft2)';tp.style.color=(m==='phone')?'#fff':'var(--text)';
+}
+
 function setLoginMode(mode){LOGIN_MODE=mode;syncLogin();}
 function syncLogin(){
   const reg=LOGIN_MODE==='register';
@@ -318,19 +343,52 @@ function syncLogin(){
   document.getElementById('reg-extra').classList.toggle('hidden',!reg);
   document.getElementById('li-switch').innerHTML=reg?`Have an account? <a href="#" onclick="setLoginMode('login');return false">Log in</a>`:`New here? <a href="#" onclick="setLoginMode('register');return false">Create account</a>`;
 }
+
+// Shared: store session + close modal + refresh UI
+function finishAuth(r){
+  TOKEN=r.token;USER=r.user;
+  localStorage.setItem('mg_token',TOKEN);localStorage.setItem('mg_user',JSON.stringify(USER));
+  closeModal('login-modal');renderAuth();toast('Welcome, '+(USER.name||USER.email));
+  if(USER.role!=='customer') openDash();
+}
+
 async function doAuth(){
   const email=document.getElementById('li-email').value.trim(),password=document.getElementById('li-pass').value;
   try{
     let r;
     if(LOGIN_MODE==='register'){r=await api('/api/auth/register',{method:'POST',body:{email,password,name:document.getElementById('li-name').value,role:document.getElementById('li-role').value}});}
     else{r=await api('/api/auth/login',{method:'POST',body:{email,password}});}
-    TOKEN=r.token;USER=r.user;localStorage.setItem('mg_token',TOKEN);localStorage.setItem('mg_user',JSON.stringify(USER));
-    closeModal('login-modal');renderAuth();toast('Welcome, '+(USER.name||USER.email));
-    if(USER.role!=='customer') openDash();
+    finishAuth(r);
   }catch(e){toast(e.message);}
 }
-function logout(){TOKEN='';USER=null;localStorage.removeItem('mg_token');localStorage.removeItem('mg_user');renderAuth();goHome();}
 
+// Phone + OTP
+async function sendOtp(){
+  const phone=document.getElementById('ph-number').value.trim();
+  if(!phone){toast('Enter your mobile number');return;}
+  try{
+    const r=await api('/api/auth/otp/request',{method:'POST',body:{phone}});
+    OTP_PHONE=phone;
+    document.getElementById('ph-code-wrap').classList.remove('hidden');
+    document.getElementById('ph-send').classList.add('hidden');
+    document.getElementById('ph-verify').classList.remove('hidden');
+    document.getElementById('ph-hint').textContent=r.dev_code?('Test mode — your code is: '+r.dev_code):'We sent a verification code to your phone.';
+  }catch(e){toast(e.message);}
+}
+async function verifyOtp(){
+  const code=document.getElementById('ph-code').value.trim();
+  const name=document.getElementById('ph-name').value.trim();
+  if(!code){toast('Enter the code');return;}
+  try{
+    const r=await api('/api/auth/otp/verify',{method:'POST',body:{phone:OTP_PHONE,code,name:name||undefined}});
+    finishAuth(r);
+  }catch(e){toast(e.message);}
+}
+
+// Social sign-in (buttons show until Google/Apple credentials are added)
+function socialSoon(p){toast(p+' sign-in will be enabled soon.');}
+
+function logout(){TOKEN='';USER=null;localStorage.removeItem('mg_token');localStorage.removeItem('mg_user');renderAuth();goHome();}
 function goHome(){show('public-view');}
 function show(id){['public-view','detail-view','dash-view'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));window.scrollTo(0,0);}
 
