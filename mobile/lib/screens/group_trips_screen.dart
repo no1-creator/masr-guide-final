@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../api.dart';
 import '../state.dart';
 import '../theme.dart';
+import 'account_screen.dart';
 
 // =============================================================================
 // Group Trips / "Create your journey" — mirrors the website feature.
@@ -736,10 +737,7 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
   }
 
   Future<void> _join(List<String> rangeDays, {String? fixedDay}) async {
-    if (!_app.isLoggedIn) {
-      _snack('Log in from the Account tab to join this trip.');
-      return;
-    }
+    if (!await promptLogin(widget.rootContext)) return;
     final days = fixedDay != null ? <String>[fixedDay] : (_joinDays.toList()..sort());
     if (fixedDay == null && rangeDays.isNotEmpty && _joinDays.isEmpty) {
       _snack('Please choose at least one day you are available.');
@@ -767,10 +765,7 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
   }
 
   Future<void> _vote(String date) async {
-    if (!_app.isLoggedIn) {
-      _snack('Log in from the Account tab to vote.');
-      return;
-    }
+    if (!await promptLogin(widget.rootContext)) return;
     setState(() => _busy = true);
     try {
       await _app.api.post('/api/group-trips/${widget.trip.id}/vote', {'date': date});
@@ -785,10 +780,7 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
 
   // Pay to lock the seat (Phase A). A real gateway plugs into this same step.
   Future<void> _pay() async {
-    if (!_app.isLoggedIn) {
-      _snack('Log in from the Account tab to pay.');
-      return;
-    }
+    if (!await promptLogin(widget.rootContext)) return;
     setState(() => _busy = true);
     try {
       await _app.api.post('/api/group-trips/${widget.trip.id}/pay', {});
@@ -1106,7 +1098,21 @@ class _TripDetailSheetState extends State<_TripDetailSheet> {
             ),
           ),
         ] else if (!_app.isLoggedIn)
-          _noteBox('Log in from the Account tab to join this trip and pick your available days.')
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.orange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              icon: const Icon(Icons.login_rounded, size: 18),
+              label: const Text('Sign in to join this trip', style: TextStyle(fontWeight: FontWeight.w700)),
+              onPressed: () async {
+                if (await promptLogin(widget.rootContext)) _load();
+              },
+            ),
+          )
         else if (canJoin) ...[
           if (finalDate != null) ...[
             const Text('Join this trip',
@@ -1430,8 +1436,8 @@ class _CreateJourneySheetState extends State<_CreateJourneySheet> {
   }
 
   Future<void> _submit() async {
-    if (!_app.isLoggedIn) {
-      setState(() => _error = 'Please log in from the Account tab first.');
+    if (!await promptLogin(widget.rootContext)) {
+      setState(() => _error = 'Please sign in to create a journey.');
       return;
     }
     final dest = _destCtrl.text.trim();
