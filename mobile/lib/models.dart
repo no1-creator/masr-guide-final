@@ -122,14 +122,29 @@ class AppUser {
   final String name;
   final String email;
   final String role;
-  AppUser({required this.id, required this.name, required this.email, required this.role});
+  final String? phone;
+  final String? avatar;
+  final String? provider;
+  AppUser({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.role,
+    this.phone,
+    this.avatar,
+    this.provider,
+  });
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
         id: _num(j['id']).toInt(),
         name: '${j['name'] ?? ''}',
         email: '${j['email'] ?? ''}',
         role: '${j['role'] ?? 'customer'}',
+        phone: j['phone']?.toString(),
+        avatar: j['avatar']?.toString(),
+        provider: j['provider']?.toString(),
       );
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'email': email, 'role': role};
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'email': email, 'role': role, 'phone': phone, 'avatar': avatar, 'provider': provider};
 }
 
 class Booking {
