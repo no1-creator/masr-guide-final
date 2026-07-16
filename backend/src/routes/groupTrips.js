@@ -1,11 +1,17 @@
 // Group Trips — tourist-created custom group trips with vehicle-based pricing.
 // Phase A (booking/confirm): money is recorded manually by admin from the
-// dashboard. Wiring a real payment gateway later needs no schema change.
+// dashboard OR by the member's "Pay" action. Wiring a real payment gateway
+// later needs no schema change — it plugs into the same /pay step.
 //
-// v2 adds: creator picks an AVAILABLE DATE RANGE (from -> to); each joiner
-// picks the scattered days that work for them within that range; when the
-// minimum is reached the trip enters 'voting'; members vote on a final day;
-// after the voting deadline the system auto-picks the winning day and confirms.
+// v3 adds the full member lifecycle:
+//   • creator picks an AVAILABLE DATE RANGE (from -> to)
+//   • each joiner picks the scattered days that work for them within the range
+//   • joining stays open (reserved, free) until the trip is FULL (max_people)
+//   • when the minimum is reached the trip enters 'voting'; members vote
+//   • after the vote deadline the winning day is auto-picked -> 'confirmed'
+//   • confirming opens a PAYMENT WINDOW (gt_pay_hours); unpaid seats expire and
+//     reopen automatically so anyone else can take them
+//   • cancelling is free until gt_cancel_hours before the trip day
 //
 // This module is self-contained: it creates its own tables + default settings
 // lazily (idempotent) so it works no matter the import order in server.js.
@@ -86,14 +92,16 @@ function ensureGt() {
     referral_code TEXT,
     joined_at TEXT NOT NULL
   )`)
-  // --- v2 migrations (added lazily on a live DB, no data loss) ---
+  // --- v2/v3 migrations (added lazily on a live DB, no data loss) ---
   ensureCol("group_trips", "date_from", "TEXT")
   ensureCol("group_trips", "date_to", "TEXT")
   ensureCol("group_trips", "final_date", "TEXT")
   ensureCol("group_trips", "vote_deadline", "TEXT")
+  ensureCol("group_trips", "pay_deadline", "TEXT")
   ensureCol("group_members", "phone", "TEXT")
   ensureCol("group_members", "available_days", "TEXT")
   ensureCol("group_members", "vote_date", "TEXT")
+  ensureCol("group_members", "paid_at", "TEXT")
   const defaults = {
     gt_enabled: "1",
     gt_min_people: "10",
@@ -102,6 +110,8 @@ function ensureGt() {
     gt_deadline_days: "7",
     gt_refund_hours: "6",
     gt_vote_hours: "48",
+    gt_pay_hours: "24", // payment window (hours) after the day is confirmed
+    gt_cancel_hours: "72", // cancellation cutoff (hours) before the trip day
     gt_vehicle_tiers: JSON.stringify(DEFAULT_TIERS),
   }
   for (const [k, v] of Object.entries(defaults))
@@ -134,6 +144,8 @@ function gtSettings() {
     deadline_days: Number(setting("gt_deadline_days", "7")),
     refund_hours: Number(setting("gt_refund_hours", "6")),
     vote_hours: Number(setting("gt_vote_hours", "48")),
+    pay_hours: Number(setting("gt_pay_hours", "24")),
+    cancel_hours: Number(setting("gt_cancel_hours", "72")),
     vehicle_tiers: tiers,
   }
 }
@@ -207,20 +219,36 @@ function candidateDays(trip) {
   return arr
 }
 
-// Auto-finalize a trip whose voting deadline has passed: pick the winning day.
+// Auto-finalize a trip whose voting deadline has passed: pick the winning day
+// and open the payment window.
 function maybeFinalize(t) {
   if (!t || t.status !== "voting") return t
   if (!t.vote_deadline || new Date(t.vote_deadline).getTime() > Date.now())
     return t
   const cands = candidateDays(t)
   const final = (cands[0] && cands[0].date) || t.date_from || t.preferred_date
+  const payHours = Number(setting("gt_pay_hours", "24")) || 24
+  const payDeadline = new Date(Date.now() + payHours * 3600000).toISOString()
   run(
-    "UPDATE group_trips SET status='confirmed', final_date=?, confirmed_at=? WHERE id=?",
+    "UPDATE group_trips SET status='confirmed', final_date=?, pay_deadline=?, confirmed_at=? WHERE id=?",
     final,
+    payDeadline,
     nowISO(),
     t.id,
   )
   return get("SELECT * FROM group_trips WHERE id=?", t.id)
+}
+
+// After the payment window closes, drop members who never paid so their seats
+// reopen for other travellers. Lazy (no scheduler) — same pattern as finalize.
+function maybeExpireUnpaid(t) {
+  if (!t || t.status !== "confirmed" || !t.pay_deadline) return t
+  if (new Date(t.pay_deadline).getTime() > Date.now()) return t
+  run(
+    "UPDATE group_members SET status='expired' WHERE trip_id=? AND status='reserved'",
+    t.id,
+  )
+  return t
 }
 
 // Current per-person price given how many seats are filled. Vehicle-based:
@@ -233,6 +261,18 @@ function perPerson(t, count) {
   return null
 }
 
+// A single, shared "phase" so the website, app and dashboard all agree.
+function phaseOf(t, count) {
+  const s = t.status
+  if (s === "confirmed") return "confirmed"
+  if (s === "completed") return "completed"
+  if (s === "cancelled" || s === "expired" || s === "closed") return "closed"
+  if (s === "pending" || s === "quoted") return "preparing"
+  if (t.max_people && count >= t.max_people) return "full"
+  if (t.min_people && count >= t.min_people) return "ready" // minimum met, room left
+  return "filling"
+}
+
 function tripView(t) {
   const count = seatsCount(t.id)
   const gpp =
@@ -243,11 +283,30 @@ function tripView(t) {
     t.price_small != null && t.small_size
       ? round2(t.price_small / t.small_size)
       : null
+  const minReached = t.min_people ? count >= t.min_people : false
+  const isFull = t.max_people ? count >= t.max_people : false
+  const payOpen =
+    t.status === "confirmed" &&
+    !!t.pay_deadline &&
+    new Date(t.pay_deadline).getTime() > Date.now()
+  const canJoin =
+    !isFull &&
+    (t.status === "open" ||
+      t.status === "voting" ||
+      (t.status === "confirmed" && payOpen))
   return {
     ...t,
     members_count: count,
+    // seats still needed to reach the MINIMUM (back-compat)
     spots_left: t.min_people ? Math.max(0, t.min_people - count) : null,
+    // seats still available until the trip is FULL
+    spots_to_max: t.max_people ? Math.max(0, t.max_people - count) : null,
     seats_to_group: t.group_size ? Math.max(0, t.group_size - count) : null,
+    min_reached: minReached,
+    is_full: isFull,
+    can_join: canJoin,
+    pay_open: payOpen,
+    phase: phaseOf(t, count),
     current_per_person: perPerson(t, count),
     small_per_person: spp,
     group_per_person: gpp,
@@ -288,18 +347,29 @@ export const routes = [
     },
   },
 
-  // --- Public list of open trips ---
+  // --- Public list: open trips, trips still in 'voting' with room, and
+  //     confirmed trips (so travellers see "complete" ones and can grab a
+  //     freed seat). Auto-finalizes + auto-expires unpaid seats on read. ---
   {
     method: "GET",
     path: "/api/group-trips",
     handler: ({ query }) => {
       ensureGt()
-      const status = query.status || "open"
-      const rows = all(
-        "SELECT * FROM group_trips WHERE status=? ORDER BY deadline ASC",
-        status,
-      )
-      return { trips: rows.map(tripView) }
+      const rows = query.status
+        ? all(
+            "SELECT * FROM group_trips WHERE status=? ORDER BY deadline ASC",
+            query.status,
+          )
+        : all(
+            "SELECT * FROM group_trips WHERE status IN ('open','voting','confirmed') ORDER BY deadline ASC",
+          )
+      return {
+        trips: rows.map((r) => {
+          let t = maybeFinalize(r)
+          maybeExpireUnpaid(t)
+          return tripView(t)
+        }),
+      }
     },
   },
 
@@ -330,6 +400,7 @@ export const routes = [
       let t = get("SELECT * FROM group_trips WHERE id=?", params.id)
       if (!t) err(404, "trip not found")
       t = maybeFinalize(t)
+      maybeExpireUnpaid(t)
       const members = all(
         "SELECT id,name,seats,status,joined_at FROM group_members WHERE trip_id=? AND status IN ('reserved','paid') ORDER BY joined_at ASC",
         t.id,
@@ -424,20 +495,32 @@ export const routes = [
     },
   },
 
-  // --- Anyone (logged-in) joins an open trip, picking their available days ---
+  // --- Anyone (logged-in) joins while the trip still has room, picking days.
+  //     Allowed for 'open', 'voting', and 'confirmed' (during the pay window)
+  //     until the trip is FULL (max_people) -> then it is "complete". ---
   {
     method: "POST",
     path: "/api/group-trips/:id/join",
     auth: true,
     handler: ({ user, params, body }) => {
       ensureGt()
-      const t = get("SELECT * FROM group_trips WHERE id=?", params.id)
+      let t = get("SELECT * FROM group_trips WHERE id=?", params.id)
       if (!t) err(404, "trip not found")
-      if (t.status !== "open") err(400, "trip is not open for joining")
+      t = maybeFinalize(t)
+      maybeExpireUnpaid(t)
+      const joinable =
+        t.status === "open" ||
+        t.status === "voting" ||
+        (t.status === "confirmed" &&
+          t.pay_deadline &&
+          new Date(t.pay_deadline).getTime() > Date.now())
+      if (!joinable) err(400, "trip is not open for joining")
       const seats = Math.max(1, Number(body.seats) || 1)
       const count = seatsCount(t.id)
+      if (t.max_people && count >= t.max_people)
+        err(400, "trip is complete — no spots left")
       if (t.max_people && count + seats > t.max_people)
-        err(400, "not enough spots left")
+        err(400, "only " + (t.max_people - count) + " spot(s) left")
       const existing = get(
         "SELECT * FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
         t.id,
@@ -467,7 +550,7 @@ export const routes = [
         body.referral_code || null,
         nowISO(),
       )
-      // When the minimum is reached, open voting on the final day.
+      // When the minimum is first reached, open voting on the final day (once).
       const newCount = seatsCount(t.id)
       if (t.min_people && newCount >= t.min_people && t.status === "open") {
         const voteHours = Number(setting("gt_vote_hours", "48")) || 48
@@ -511,7 +594,41 @@ export const routes = [
     },
   },
 
-  // --- Leave / cancel my seat (respects refund window) ---
+  // --- Member pays to lock their seat (Phase A: marks paid; a real payment
+  //     gateway will call this same step later with no schema change). ---
+  {
+    method: "POST",
+    path: "/api/group-trips/:id/pay",
+    auth: true,
+    handler: ({ user, params }) => {
+      ensureGt()
+      let t = get("SELECT * FROM group_trips WHERE id=?", params.id)
+      if (!t) err(404, "trip not found")
+      t = maybeFinalize(t)
+      if (t.status !== "confirmed")
+        err(400, "payment opens after the trip day is confirmed")
+      if (t.pay_deadline && new Date(t.pay_deadline).getTime() < Date.now())
+        err(400, "the payment window has closed")
+      const m = get(
+        "SELECT * FROM group_members WHERE trip_id=? AND user_id=? AND status IN ('reserved','paid')",
+        t.id,
+        user.id,
+      )
+      if (!m) err(404, "join the trip before paying")
+      run(
+        "UPDATE group_members SET status='paid', paid_at=? WHERE id=?",
+        nowISO(),
+        m.id,
+      )
+      return {
+        ok: true,
+        member: get("SELECT * FROM group_members WHERE id=?", m.id),
+      }
+    },
+  },
+
+  // --- Leave / cancel my seat. Free before a day is fixed; after that,
+  //     allowed until gt_cancel_hours before the trip. Frees the seat. ---
   {
     method: "POST",
     path: "/api/group-trips/:id/leave",
@@ -527,11 +644,17 @@ export const routes = [
       )
       if (!m) err(404, "you are not a member of this trip")
       const s = gtSettings()
-      const refDate = t.final_date || t.preferred_date || t.date_from
+      // The cutoff only applies once the trip day is fixed (confirmed).
+      const refDate = t.final_date || null
       if (refDate) {
-        const cutoff = new Date(refDate).getTime() - s.refund_hours * 3600000
+        const cutoff = new Date(refDate).getTime() - s.cancel_hours * 3600000
         if (Date.now() > cutoff)
-          err(400, "refund window has passed (" + s.refund_hours + "h before trip)")
+          err(
+            400,
+            "cancellation window has closed (" +
+              s.cancel_hours +
+              "h before the trip)",
+          )
       }
       run("UPDATE group_members SET status='cancelled' WHERE id=?", m.id)
       return { ok: true }
@@ -554,6 +677,8 @@ export const routes = [
         gt_deadline_days: "deadline_days",
         gt_refund_hours: "refund_hours",
         gt_vote_hours: "vote_hours",
+        gt_pay_hours: "pay_hours",
+        gt_cancel_hours: "cancel_hours",
       }
       for (const [key, field] of Object.entries(num))
         if (body[field] !== undefined && body[field] !== null)
@@ -640,10 +765,17 @@ export const routes = [
       if (!allowed.includes(status)) err(400, "invalid status")
       const confirmed_at =
         status === "confirmed" ? t.confirmed_at || nowISO() : t.confirmed_at
+      // Opening 'confirmed' manually also starts the payment window.
+      let pay_deadline = t.pay_deadline
+      if (status === "confirmed" && !pay_deadline) {
+        const payHours = Number(setting("gt_pay_hours", "24")) || 24
+        pay_deadline = new Date(Date.now() + payHours * 3600000).toISOString()
+      }
       run(
-        "UPDATE group_trips SET status=?, confirmed_at=? WHERE id=?",
+        "UPDATE group_trips SET status=?, confirmed_at=?, pay_deadline=? WHERE id=?",
         status,
         confirmed_at,
+        pay_deadline,
         t.id,
       )
       return get("SELECT * FROM group_trips WHERE id=?", t.id)
@@ -663,9 +795,12 @@ export const routes = [
       const final =
         body.final_date || (cands[0] && cands[0].date) || t.date_from
       if (!final) err(400, "no candidate day available to finalize")
+      const payHours = Number(setting("gt_pay_hours", "24")) || 24
+      const payDeadline = new Date(Date.now() + payHours * 3600000).toISOString()
       run(
-        "UPDATE group_trips SET status='confirmed', final_date=?, confirmed_at=? WHERE id=?",
+        "UPDATE group_trips SET status='confirmed', final_date=?, pay_deadline=?, confirmed_at=? WHERE id=?",
         final,
+        payDeadline,
         nowISO(),
         t.id,
       )
@@ -706,9 +841,10 @@ export const routes = [
             : "paid"
       const amount = body.amount !== undefined ? Number(body.amount) : m.amount
       run(
-        "UPDATE group_members SET status=?, amount=? WHERE id=?",
+        "UPDATE group_members SET status=?, amount=?, paid_at=? WHERE id=?",
         status,
         amount,
+        status === "paid" ? nowISO() : m.paid_at || null,
         m.id,
       )
       return get("SELECT * FROM group_members WHERE id=?", m.id)
