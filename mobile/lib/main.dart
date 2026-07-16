@@ -25,6 +25,7 @@ class RaGoApp extends StatelessWidget {
     return MaterialApp(
       title: 'RaGo',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       theme: buildTheme(),
       home: const SplashScreen(next: RootNav()),
     );
