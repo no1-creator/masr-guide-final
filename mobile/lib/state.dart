@@ -242,48 +242,42 @@ class AppState extends ChangeNotifier {
   }
 
   void _setSession(Map<String, dynamic> res) {
-  token = '${res['token']}';
-  api.token = token;
-  user = AppUser.fromJson(Map<String, dynamic>.from(res['user']));
-}
-
-Future<void> login(String email, String password) async {
-  _setSession(await api.login(email, password));
-  await _persist();
-  notifyListeners();
-}
-
-Future<void> register(String name, String email, String password, String role) async {
-  _setSession(await api.register({'name': name, 'email': email, 'password': password, 'role': role}));
-  await _persist();
-  notifyListeners();
-}
-
-// Phone + OTP
-Future<Map<String, dynamic>> requestOtp(String phone) => api.otpRequest(phone);
-Future<void> verifyOtp(String phone, String code, {String? name}) async {
-  _setSession(await api.otpVerify(phone, code, name: name));
-  await _persist();
-  notifyListeners();
-}
-
-// Social sign-in
-Future<void> loginWithGoogle(String idToken) async {
-  _setSession(await api.googleAuth(idToken));
-  await _persist();
-  notifyListeners();
-}
-
-Future<void> loginWithApple(String identityToken, {String? name}) async {
-  _setSession(await api.appleAuth(identityToken, name: name));
-  await _persist();
-  notifyListeners();
-}
-  Future<void> register(String name, String email, String password, String role) async {
-    final res = await api.register({'name': name, 'email': email, 'password': password, 'role': role});
     token = '${res['token']}';
     api.token = token;
     user = AppUser.fromJson(Map<String, dynamic>.from(res['user']));
+  }
+
+  Future<void> login(String email, String password) async {
+    _setSession(await api.login(email, password));
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> register(String name, String email, String password, String role) async {
+    _setSession(await api.register(
+        {'name': name, 'email': email, 'password': password, 'role': role}));
+    await _persist();
+    notifyListeners();
+  }
+
+  // Phone + OTP
+  Future<Map<String, dynamic>> requestOtp(String phone) => api.otpRequest(phone);
+
+  Future<void> verifyOtp(String phone, String code, {String? name}) async {
+    _setSession(await api.otpVerify(phone, code, name: name));
+    await _persist();
+    notifyListeners();
+  }
+
+  // Social sign-in
+  Future<void> loginWithGoogle(String idToken) async {
+    _setSession(await api.googleAuth(idToken));
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> loginWithApple(String identityToken, {String? name}) async {
+    _setSession(await api.appleAuth(identityToken, name: name));
     await _persist();
     notifyListeners();
   }
