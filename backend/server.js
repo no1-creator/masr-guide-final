@@ -20,8 +20,6 @@ import { routes as groupTripRoutes } from "./src/routes/groupTrips.js"
 
 migrate()
 
-// Ensure the Pharmacy & Health category exists. Idempotent and safe on a live
-// database with real data — INSERT OR IGNORE only adds it if the key is missing.
 run(
   "INSERT OR IGNORE INTO categories (key,icon,labels) VALUES (?,?,?)",
   "pharmacy",
@@ -36,9 +34,6 @@ run(
   }),
 )
 
-// Prices are shown in US Dollars ($) across the website and app. This
-// idempotent migration relabels any legacy EGP rows to USD on the live DB.
-// It only changes the currency label — it never touches the numeric price.
 run("UPDATE services SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
 run("UPDATE bookings SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
 
@@ -81,15 +76,9 @@ function matchRoute(method, pathname) {
 }
 
 const PORT = process.env.PORT || 4000
-// A unique id per server start (per deploy). Used to version the dashboard
-// enhancement URL so a fresh copy is fetched after every deploy.
 const BUILD_ID = Date.now()
 const PUBLIC_DIR = new URL("./public/", import.meta.url).pathname
 
-// World-class dashboard chrome (server-injected CSS, additive & safe).
-// Restyles the sidebar menu, buttons, header and adds premium shadows across
-// ALL role dashboards. It only overrides visual properties via a <style> tag
-// added to the served HTML; no source file and no behaviour is changed.
 const CHROME_CSS =
   "#dash-title{font-size:23px;font-weight:800;letter-spacing:-.4px;color:var(--text)}" +
   "#dnav{display:flex;flex-direction:column;gap:5px}" +
@@ -107,12 +96,6 @@ const CHROME_CSS =
   ".dp-kpi,.dp-panel{box-shadow:0 1px 2px rgba(18,59,76,.05)}" +
   ".dp-panel:hover{box-shadow:0 10px 24px rgba(18,59,76,.07)}"
 
-// Autofill guard (server-injected JS, additive & safe). Some browsers dump the
-// saved login email into the public "Search trips" box (#q) because it is a lone
-// text field. This makes #q readonly-until-focus (which browsers never autofill)
-// and clears any email that slipped in, then refreshes the results. It never
-// interferes once the user actually focuses/typing in the box, and no source
-// file is modified — only the SERVED HTML gets this tiny guard.
 const NOFILL_JS =
   "(function(){function fix(){var q=document.getElementById('q');if(!q)return;" +
   "if(!q.__ragoInit){q.__ragoInit=1;q.setAttribute('autocomplete','off');" +
@@ -136,6 +119,12 @@ const MIME = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
 }
+
+// Renderer files: eagerly loaded on page load so detail pages open instantly
+// on first click without any lazy-load delay.
+const RENDERER_FILES = [
+  "service-detail-transport.js",
+]
 
 async function serveStatic(res, pathname) {
   try {
@@ -178,12 +167,7 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", sdd + "</html>")
         else html = html + sdd
       }
-      // Per-category service content (5 additive files). Each file populates
-      // window.RAGO_SDP.CONTENT/FACTS/DESC for its own category keys so every
-      // service type has its own professional content (not a generic trip).
-      // They must load AFTER service-detail-data.js and BEFORE
-      // service-detail-pro.js. Purely additive; a broken file only disables its
-      // own family and falls back to the shared bucket content.
+      // Per-category service content files (additive, load after data.js)
       for (let i = 1; i <= 5; i++) {
         const scMark = "service-content-" + i + ".js?b="
         if (!html.includes(scMark)) {
@@ -191,6 +175,18 @@ async function serveStatic(res, pathname) {
           if (html.includes("</body>")) html = html.replace("</body>", sc + "</body>")
           else if (html.includes("</html>")) html = html.replace("</html>", sc + "</html>")
           else html = html + sc
+        }
+      }
+      // Renderer files: loaded after content files, before pro.js.
+      // Each renderer registers window.RAGO_RENDERERS[key] so detail pages
+      // open instantly on the very first click — no lazy-load delay.
+      for (const rf of RENDERER_FILES) {
+        const rfMark = rf + "?b="
+        if (!html.includes(rfMark)) {
+          const rft = '\n<script src="' + rf + '?b=' + BUILD_ID + '"></script>\n'
+          if (html.includes("</body>")) html = html.replace("</body>", rft + "</body>")
+          else if (html.includes("</html>")) html = html.replace("</html>", rft + "</html>")
+          else html = html + rft
         }
       }
       if (!html.includes("service-detail-pro.js?b=")) {
