@@ -12,6 +12,23 @@
   function _CONTENT(){ return _D().CONTENT || {}; }
   function _FACTS(){ return _D().FACTS || {}; }
 
+  // Renderer registry — specialized per-category renderers register here.
+  // Files like service-detail-transport.js call:
+  //   window.RAGO_RENDERERS['airport'] = renderFn;
+  window.RAGO_RENDERERS = window.RAGO_RENDERERS || {};
+
+  // Map of category key -> renderer filename (lazy-loaded on first click)
+  var _RENDERER_MAP = {
+    'airport':'service-detail-transport.js','transfers':'service-detail-transport.js',
+    'carrental':'service-detail-transport.js','departure':'service-detail-transport.js',
+    'hotels':'service-detail-stay.js','nile-cruise':'service-detail-stay.js',
+    'internal-trips':'service-detail-activity.js','tours':'service-detail-activity.js',
+    'diving':'service-detail-activity.js','safari':'service-detail-activity.js','events':'service-detail-activity.js',
+    'visa':'service-detail-svc.js','guide':'service-detail-svc.js','sim':'service-detail-svc.js',
+    'spa':'service-detail-svc.js','dining':'service-detail-svc.js','insurance':'service-detail-svc.js',
+    'shopping':'service-detail-shop.js','pharmacy':'service-detail-shop.js'
+  };
+
   function injectStyles(){
     if (document.getElementById('sd-styles') || !_CSS()) return;
     var st = document.createElement('style');
@@ -24,7 +41,7 @@
   function esc2(s){ return (typeof window.esc === 'function') ? window.esc(s) : String(s==null?'':s); }
   function icon2(n){ return (typeof window.iconSvg === 'function') ? window.iconSvg(n) : ''; }
   function refCode(){ try { return (typeof REF !== 'undefined' && REF) ? REF : ''; } catch(e){ return ''; } }
-  function stars(r){ r = Math.round(Number(r)||0); var s=''; for (var i=1;i<=5;i++) s += (i<=r ? '★' : '☆'); return s; }
+  function stars(r){ r = Math.round(Number(r)||0); var s=''; for (var i=1;i<=5;i++) s += (i<=r ? '&#9733;' : '&#9734;'); return s; }
   function typeOf(k){
     if (['airport','transfers','carrental','departure'].indexOf(k) >= 0) return 'transport';
     if (['hotels'].indexOf(k) >= 0) return 'stay';
@@ -56,7 +73,7 @@
     var rows = '';
     for (var st=5; st>=1; st--){
       var pct = Math.round(c[st-1] / total * 100);
-      rows += '<div class="sd-bar"><span>' + st + ' ★</span><i><b style="width:' + pct + '%"></b></i><em>' + c[st-1] + '</em></div>';
+      rows += '<div class="sd-bar"><span>' + st + ' &#9733;</span><i><b style="width:' + pct + '%"></b></i><em>' + c[st-1] + '</em></div>';
     }
     return rows;
   }
@@ -65,6 +82,17 @@
     var d = esc2((s.description || '').trim());
     if (d.length > 40) return d;
     return (d ? d + ' ' : '') + 'Discover ' + esc2(s.title) + (loc ? (' in ' + esc2(loc)) : '') + '. ' + (DESC[key] || DESC[t] || DESC.experience || '');
+  }
+
+  function showRendered(html){
+    var host = document.getElementById('detail-body');
+    if (host) host.innerHTML = html;
+    try {
+      var pv = document.getElementById('public-view'); if (pv) pv.classList.add('hidden');
+      var dv = document.getElementById('detail-view'); if (dv) dv.classList.remove('hidden');
+      window.scrollTo(0, 0);
+      setTimeout(function(){ try { window.scrollTo(0, 0); } catch(e){} }, 30);
+    } catch(e){}
   }
 
   async function enhance(id){
@@ -90,6 +118,42 @@
     var vname = (s.vendor && s.vendor.name) ? s.vendor.name : (catLabel + ' provider');
     var similar = [];
     try { similar = ((await api2('/api/services?cat=' + encodeURIComponent(key))) || []).filter(function(x){ return x.id !== s.id; }).slice(0, 3); } catch(e){}
+
+    // --- Specialized renderer check ---
+    // If a professional renderer is already registered for this category, use it.
+    if (typeof window.RAGO_RENDERERS[key] === 'function') {
+      showRendered(window.RAGO_RENDERERS[key](s, cat, reviews, similar, c, key));
+      return;
+    }
+    // Lazy-load the renderer file for this category on first click.
+    var _rf = _RENDERER_MAP[key];
+    if (_rf && !document.getElementById('rago-r-' + key)) {
+      var _lhost = document.getElementById('detail-body');
+      var _emoji = {transport:'✈',stay:'🏨',experience:'🧭',service:'📋',shop:'🛍'}[t] || '⏳';
+      if (_lhost) _lhost.innerHTML = '<div style="padding:60px 20px;text-align:center">' +
+        '<div style="font-size:40px;margin-bottom:14px">' + _emoji + '</div>' +
+        '<div style="font-size:17px;font-weight:800;color:var(--blue)">Loading professional view...</div>' +
+        '<div style="font-size:13px;color:var(--text2);margin-top:6px">One moment</div></div>';
+      try {
+        var pv0=document.getElementById('public-view'); if(pv0) pv0.classList.add('hidden');
+        var dv0=document.getElementById('detail-view'); if(dv0) dv0.classList.remove('hidden');
+        window.scrollTo(0,0);
+      } catch(e){}
+      var _sc = document.createElement('script');
+      _sc.id = 'rago-r-' + key;
+      _sc.src = '/' + _rf + '?' + Date.now();
+      var _cid = id;
+      _sc.onload = function(){
+        try { window.openDetail(_cid); } catch(e){}
+      };
+      _sc.onerror = function(){
+        // Renderer failed to load — fall through to generic render on next click
+        var el=document.getElementById('rago-r-'+key); if(el) el.remove();
+      };
+      document.head.appendChild(_sc);
+      return;
+    }
+    // --- End specialized renderer check ---
 
     var facts = (_FACTS()[key] || _FACTS()[t] || _FACTS().experience || []).map(function(f){
       var title = f.t; var desc = f.d;
@@ -119,17 +183,17 @@
     var initials = esc2((vname || 'R').trim().charAt(0).toUpperCase());
     var provider = '<div class="sd-prov"><div class="sd-av">' + initials + '</div>'
       + '<div style="flex:1"><div style="font-weight:800;color:var(--text)">' + esc2(vname) + '</div>'
-      + '<div class="muted" style="font-size:13px">' + esc2(loc || 'Egypt') + ' · <span class="star">★ ' + rating + '</span></div></div>'
-      + '<span class="sd-badge">✓ Verified</span></div>';
+      + '<div class="muted" style="font-size:13px">' + esc2(loc || 'Egypt') + ' &#183; <span class="star">&#9733; ' + rating + '</span></div></div>'
+      + '<span class="sd-badge">&#10003; Verified</span></div>';
 
-    var revSummary = '<div class="sd-revsum"><div class="sd-revbig"><div class="n">' + (rating || '—') + '</div>'
+    var revSummary = '<div class="sd-revsum"><div class="sd-revbig"><div class="n">' + (rating || '&mdash;') + '</div>'
       + '<div class="s">' + stars(rating) + '</div>'
       + '<div class="muted" style="font-size:12px;margin-top:4px">' + rc + ' reviews</div></div>'
       + '<div class="sd-bars">' + ratingBars(reviews) + '</div></div>';
     var revList = reviews.length
       ? reviews.map(function(r){
           return '<div class="sd-rev"><div class="top"><span class="who">' + esc2(r.name || 'Guest') + '</span>'
-            + '<span class="star">★ ' + (r.rating != null ? r.rating : '') + '</span></div>'
+            + '<span class="star">&#9733; ' + (r.rating != null ? r.rating : '') + '</span></div>'
             + '<div class="muted" style="font-size:14px;line-height:1.6">' + esc2(r.comment || '') + '</div></div>';
         }).join('')
       : "<p class='sd-lead'>No reviews yet - be the first to share your experience.</p>";
@@ -142,34 +206,34 @@
           + '<div class="bd"><div class="t">' + esc2(x.title) + '</div>'
           + '<div class="muted" style="font-size:12.5px">' + esc2(x.location || '') + '</div>'
           + '<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
-          + '<span class="star" style="font-size:12.5px">★ ' + (x.rating != null ? x.rating : 0) + '</span>'
+          + '<span class="star" style="font-size:12.5px">&#9733; ' + (x.rating != null ? x.rating : 0) + '</span>'
           + '<span class="price" style="font-weight:800;color:var(--blue)">' + money2(x.price) + '</span></div></div></div>';
       }).join('') + '</div>');
     }
 
     var logi = '<ul class="sd-ul sd-note">'
-      + '<li><span class="sd-ic">•</span><span><b style="font-weight:700;color:var(--text)">Location:</b> ' + esc2(loc || 'Egypt') + '</span></li>'
-      + '<li><span class="sd-ic">•</span><span><b style="font-weight:700;color:var(--text)">Duration:</b> ' + esc2(dur) + '</span></li>'
-      + '<li><span class="sd-ic">•</span><span>' + esc2(c.logi) + '</span></li>'
+      + '<li><span class="sd-ic">&#8226;</span><span><b style="font-weight:700;color:var(--text)">Location:</b> ' + esc2(loc || 'Egypt') + '</span></li>'
+      + '<li><span class="sd-ic">&#8226;</span><span><b style="font-weight:700;color:var(--text)">Duration:</b> ' + esc2(dur) + '</span></li>'
+      + '<li><span class="sd-ic">&#8226;</span><span>' + esc2(c.logi) + '</span></li>'
       + '</ul>';
 
-    var incBlock = '<div class="sd-cols"><div><h4>Included</h4>' + liList(c.included, '✓', 'sd-yes') + '</div>'
-      + '<div><h4>Not included</h4>' + liList(c.notIncluded, '✗', 'sd-no') + '</div></div>';
+    var incBlock = '<div class="sd-cols"><div><h4>Included</h4>' + liList(c.included, '&#10003;', 'sd-yes') + '</div>'
+      + '<div><h4>Not included</h4>' + liList(c.notIncluded, '&#10007;', 'sd-no') + '</div></div>';
 
     var L = '';
-    L += '<div class="sd-crumb"><a href="#" onclick="goHome();return false">Home</a> › ' + esc2(catLabel) + ' › ' + esc2(s.title) + '</div>';
+    L += '<div class="sd-crumb"><a href="#" onclick="goHome();return false">Home</a> &rsaquo; ' + esc2(catLabel) + ' &rsaquo; ' + esc2(s.title) + '</div>';
     L += '<div class="eyebrow">' + esc2(s.vendor ? s.vendor.name : catLabel) + '</div>';
     L += '<h2 style="margin:2px 0 6px">' + esc2(s.title) + '</h2>';
-    L += '<p class="muted" style="margin:0"><span class="star">' + stars(rating) + '</span> <b style="color:var(--text)">' + rating + '</b> (' + rc + ' reviews) &nbsp;·&nbsp; ' + esc2(loc) + ' &nbsp;·&nbsp; ' + esc2(dur) + '</p>';
+    L += '<p class="muted" style="margin:0"><span class="star">' + stars(rating) + '</span> <b style="color:var(--text)">' + rating + '</b> (' + rc + ' reviews) &nbsp;&middot;&nbsp; ' + esc2(loc) + ' &nbsp;&middot;&nbsp; ' + esc2(dur) + '</p>';
     L += '<div class="sd-facts">' + facts + '</div>';
     L += gallery;
     L += section('Overview', '<p class="sd-lead">' + overviewText(s, t, loc, key) + '</p>');
-    L += section('Highlights', liList(c.highlights, '✦', 'sd-hl'));
+    L += section('Highlights', liList(c.highlights, '&#10022;', 'sd-hl'));
     L += section("What's included", incBlock);
     L += section(isShop ? 'How it works' : 'What to expect', stepsHtml(c.steps));
     L += section('Where & how', logi);
     L += availBlock;
-    L += section('Good to know', liList(c.goodToKnow, '•', 'sd-note'));
+    L += section('Good to know', liList(c.goodToKnow, '&#8226;', 'sd-note'));
     L += section('Cancellation policy', '<p class="sd-lead">' + cancelText + '</p>');
     L += section('Your provider', provider);
     L += section('Frequently asked questions', faqHtml(c.faq));
@@ -177,27 +241,20 @@
     L += simBlock;
 
     var R = '<div class="box sd-book">'
-      + (s.featured ? '<div class="sd-badge" style="margin-bottom:10px">★ Featured</div>' : '')
+      + (s.featured ? '<div class="sd-badge" style="margin-bottom:10px">&#9733; Featured</div>' : '')
       + '<div class="price" style="font-size:30px;font-weight:900;color:var(--blue)">' + money2(s.price) + '</div>'
       + '<div class="muted">' + (isShop ? 'Retail price' : 'per person') + '</div>'
       + '<button class="btn" style="width:100%;margin-top:14px;padding:12px 16px" onclick="openBooking()">' + (c.cta || 'Book now') + '</button>'
       + '<ul class="sd-trust">'
-      + '<li><span class="sd-ic">✓</span> Instant confirmation</li>'
-      + '<li><span class="sd-ic">✓</span> ' + (isShop ? 'Secure ordering' : 'Free / flexible cancellation') + '</li>'
-      + '<li><span class="sd-ic">✓</span> Secure booking &amp; payment</li>'
-      + '<li><span class="sd-ic">✓</span> 24/7 customer support</li>'
+      + '<li><span class="sd-ic">&#10003;</span> Instant confirmation</li>'
+      + '<li><span class="sd-ic">&#10003;</span> ' + (isShop ? 'Secure ordering' : 'Free / flexible cancellation') + '</li>'
+      + '<li><span class="sd-ic">&#10003;</span> Secure booking &amp; payment</li>'
+      + '<li><span class="sd-ic">&#10003;</span> 24/7 customer support</li>'
       + '</ul>'
       + (refCode() ? '<div class="sd-save">Referral applied: ' + esc2(refCode()) + '</div>' : '')
       + '</div>';
 
-    var host = document.getElementById('detail-body');
-    if (host) host.innerHTML = '<div class="two"><div>' + L + '</div><div>' + R + '</div></div>';
-    try {
-      var pv = document.getElementById('public-view'); if (pv) pv.classList.add('hidden');
-      var dv = document.getElementById('detail-view'); if (dv) dv.classList.remove('hidden');
-      window.scrollTo(0, 0);
-      setTimeout(function(){ try { window.scrollTo(0, 0); } catch(e){} }, 30);
-    } catch(e){}
+    showRendered('<div class="two"><div>' + L + '</div><div>' + R + '</div></div>');
   }
 
   function install(){
