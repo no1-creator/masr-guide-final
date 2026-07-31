@@ -485,3 +485,21 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+/* ===================================================================
+ * RaGo — load world-class dashboards enhancement (additive)
+ * Dynamically loads dashboard-pro.js, which upgrades the Admin / Vendor /
+ * Marketer overview screens with premium KPI cards, growth/decline
+ * indicators, sparklines and report panels. Placed here (an already-loaded
+ * script) so app.html needs no change. Safe: no-op if the file is missing
+ * and it only augments the global SEC renderers defined in app.html.
+ * =================================================================== */
+(function () {
+  'use strict';
+  if (document.getElementById('rago-dashboard-pro')) return;
+  var s = document.createElement('script');
+  s.id = 'rago-dashboard-pro';
+  s.src = 'dashboard-pro.js';
+  s.defer = true;
+  (document.body || document.head || document.documentElement).appendChild(s);
+})();
