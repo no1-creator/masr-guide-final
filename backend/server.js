@@ -146,55 +146,52 @@ async function serveStatic(res, pathname) {
     if (!st.isFile()) return false
     const ext = extname(fp)
 
-    // Serve the HTML shell fresh every time, guarantee the world-class
-    // dashboard enhancement loads, and inject premium chrome styles. All
-    // changes are purely additive: the file on disk is never modified, we only
-    // adjust the SERVED response.
     if (ext === ".html") {
       let html = (await readFile(fp)).toString("utf8")
-      // Premium chrome styles (menu/buttons/colors) for all dashboards.
       if (!html.includes('id="rago-chrome"')) {
         const styleTag = '\n<style id="rago-chrome">' + CHROME_CSS + "</style>\n"
         if (html.includes("</head>")) html = html.replace("</head>", styleTag + "</head>")
         else if (html.includes("</body>")) html = html.replace("</body>", styleTag + "</body>")
         else html = styleTag + html
       }
-      // Force-load dashboard-pro.js with a per-deploy version, independent of
-      // any cached demo-trips.js loader or cached dashboard-pro.js. The script
-      // is idempotent (it guards against double-install), so this is safe even
-      // when the existing loader also runs.
       if (!html.includes("dashboard-pro.js?b=")) {
         const tag = '\n<script src="dashboard-pro.js?b=' + BUILD_ID + '"></script>\n'
         if (html.includes("</body>")) html = html.replace("</body>", tag + "</body>")
         else if (html.includes("</html>")) html = html.replace("</html>", tag + "</html>")
         else html = html + tag
       }
-      // Load the Admin control center (providers / services / bookings
-      // management). Self-contained file that chains after dashboard-pro.js;
-      // purely additive, no source file changed.
       if (!html.includes("admin-pro.js?b=")) {
         const ap = '\n<script src="admin-pro.js?b=' + BUILD_ID + '"></script>\n'
         if (html.includes("</body>")) html = html.replace("</body>", ap + "</body>")
         else if (html.includes("</html>")) html = html.replace("</html>", ap + "</html>")
         else html = html + ap
       }
-      // Load the Provider & Marketer control enhancements (dash-plus.js).
-      // Self-contained; chains after admin-pro.js. Purely additive, no source
-      // file changed.
       if (!html.includes("dash-plus.js?b=")) {
         const dpx = '\n<script src="dash-plus.js?b=' + BUILD_ID + '"></script>\n'
         if (html.includes("</body>")) html = html.replace("</body>", dpx + "</body>")
         else if (html.includes("</html>")) html = html.replace("</html>", dpx + "</html>")
         else html = html + dpx
       }
-      // Load the world-class service detail page. Two additive files: the DATA
-      // file (styles + category-aware content) must load BEFORE the enhancer
-      // (service-detail-pro.js), which wraps openDetail(). No source changed.
       if (!html.includes("service-detail-data.js?b=")) {
         const sdd = '\n<script src="service-detail-data.js?b=' + BUILD_ID + '"></script>\n'
         if (html.includes("</body>")) html = html.replace("</body>", sdd + "</body>")
         else if (html.includes("</html>")) html = html.replace("</html>", sdd + "</html>")
         else html = html + sdd
+      }
+      // Per-category service content (5 additive files). Each file populates
+      // window.RAGO_SDP.CONTENT/FACTS/DESC for its own category keys so every
+      // service type has its own professional content (not a generic trip).
+      // They must load AFTER service-detail-data.js and BEFORE
+      // service-detail-pro.js. Purely additive; a broken file only disables its
+      // own family and falls back to the shared bucket content.
+      for (let i = 1; i <= 5; i++) {
+        const scMark = "service-content-" + i + ".js?b="
+        if (!html.includes(scMark)) {
+          const sc = '\n<script src="service-content-' + i + '.js?b=' + BUILD_ID + '"></script>\n'
+          if (html.includes("</body>")) html = html.replace("</body>", sc + "</body>")
+          else if (html.includes("</html>")) html = html.replace("</html>", sc + "</html>")
+          else html = html + sc
+        }
       }
       if (!html.includes("service-detail-pro.js?b=")) {
         const sdp = '\n<script src="service-detail-pro.js?b=' + BUILD_ID + '"></script>\n'
@@ -202,17 +199,12 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", sdp + "</html>")
         else html = html + sdp
       }
-      // Load the world-class public homepage enhancer (home-pro.js): richer
-      // service cards, trust strip, professional footer and back-to-top. Wraps
-      // loadServices(); purely additive, no source file changed.
       if (!html.includes("home-pro.js?b=")) {
         const hp = '\n<script src="home-pro.js?b=' + BUILD_ID + '"></script>\n'
         if (html.includes("</body>")) html = html.replace("</body>", hp + "</body>")
         else if (html.includes("</html>")) html = html.replace("</html>", hp + "</html>")
         else html = html + hp
       }
-      // Stop browser autofill from dumping the saved login email into the public
-      // "Search trips" box (#q). Purely additive guard; no source file changed.
       if (!html.includes('id="rago-nofill"')) {
         const nf = '\n<script id="rago-nofill">' + NOFILL_JS + "</script>\n"
         if (html.includes("</body>")) html = html.replace("</body>", nf + "</body>")
@@ -231,7 +223,6 @@ async function serveStatic(res, pathname) {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
     }
-    // Never cache JS bundles so updates reach users immediately.
     if (ext === ".js") headers["Cache-Control"] = "no-store, must-revalidate"
     res.writeHead(200, headers)
     res.end(buf)
