@@ -187,6 +187,21 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", dpx + "</html>")
         else html = html + dpx
       }
+      // Load the world-class service detail page. Two additive files: the DATA
+      // file (styles + category-aware content) must load BEFORE the enhancer
+      // (service-detail-pro.js), which wraps openDetail(). No source changed.
+      if (!html.includes("service-detail-data.js?b=")) {
+        const sdd = '\n<script src="service-detail-data.js?b=' + BUILD_ID + '"></script>\n'
+        if (html.includes("</body>")) html = html.replace("</body>", sdd + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", sdd + "</html>")
+        else html = html + sdd
+      }
+      if (!html.includes("service-detail-pro.js?b=")) {
+        const sdp = '\n<script src="service-detail-pro.js?b=' + BUILD_ID + '"></script>\n'
+        if (html.includes("</body>")) html = html.replace("</body>", sdp + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", sdp + "</html>")
+        else html = html + sdp
+      }
       // Stop browser autofill from dumping the saved login email into the public
       // "Search trips" box (#q). Purely additive guard; no source file changed.
       if (!html.includes('id="rago-nofill"')) {
