@@ -6,17 +6,17 @@
  * openBooking, goHome, REF and the same API endpoints. */
 (function () {
   'use strict';
-  var D = window.RAGO_SDP || {};
-  var CSS = D.CSS || '';
-  var DESC = D.DESC || {};
-  var CONTENT = D.CONTENT || {};
-  var FACTS = D.FACTS || {};
+  function _D(){ return window.RAGO_SDP || {}; }
+  function _CSS(){ return _D().CSS || ''; }
+  function _DESC(){ return _D().DESC || {}; }
+  function _CONTENT(){ return _D().CONTENT || {}; }
+  function _FACTS(){ return _D().FACTS || {}; }
 
   function injectStyles(){
-    if (document.getElementById('sd-styles') || !CSS) return;
+    if (document.getElementById('sd-styles') || !_CSS()) return;
     var st = document.createElement('style');
     st.id = 'sd-styles';
-    st.textContent = CSS;
+    st.textContent = _CSS();
     (document.head || document.documentElement).appendChild(st);
   }
   function api2(p){ return window.api(p); }
@@ -60,10 +60,11 @@
     }
     return rows;
   }
-  function overviewText(s, t, loc){
+  function overviewText(s, t, loc, key){
+    var DESC = _DESC();
     var d = esc2((s.description || '').trim());
     if (d.length > 40) return d;
-    return (d ? d + ' ' : '') + 'Discover ' + esc2(s.title) + (loc ? (' in ' + esc2(loc)) : '') + '. ' + (DESC[t] || DESC.experience || '');
+    return (d ? d + ' ' : '') + 'Discover ' + esc2(s.title) + (loc ? (' in ' + esc2(loc)) : '') + '. ' + (DESC[key] || DESC[t] || DESC.experience || '');
   }
 
   async function enhance(id){
@@ -74,7 +75,8 @@
     var key = cat ? cat.key : '';
     var catLabel = cat ? ((cat.labels && cat.labels.en) || cat.key) : 'Experience';
     var t = typeOf(key);
-    var c = CONTENT[t] || CONTENT.experience;
+    var CONTENT = _CONTENT();
+    var c = CONTENT[key] || CONTENT[t] || CONTENT.experience;
     if (!c) return;
     var isShop = (t === 'shop');
     var imgs = (s.images && s.images.length) ? s.images : [s.cover].filter(Boolean);
@@ -89,7 +91,7 @@
     var similar = [];
     try { similar = ((await api2('/api/services?cat=' + encodeURIComponent(key))) || []).filter(function(x){ return x.id !== s.id; }).slice(0, 3); } catch(e){}
 
-    var facts = (FACTS[t] || FACTS.experience || []).map(function(f){
+    var facts = (_FACTS()[key] || _FACTS()[t] || _FACTS().experience || []).map(function(f){
       var title = f.t; var desc = f.d;
       if (f.d === 'Duration') title = dur;
       if (f.d === 'Location') title = (loc || 'Prime area');
@@ -161,7 +163,7 @@
     L += '<p class="muted" style="margin:0"><span class="star">' + stars(rating) + '</span> <b style="color:var(--text)">' + rating + '</b> (' + rc + ' reviews) &nbsp;·&nbsp; ' + esc2(loc) + ' &nbsp;·&nbsp; ' + esc2(dur) + '</p>';
     L += '<div class="sd-facts">' + facts + '</div>';
     L += gallery;
-    L += section('Overview', '<p class="sd-lead">' + overviewText(s, t, loc) + '</p>');
+    L += section('Overview', '<p class="sd-lead">' + overviewText(s, t, loc, key) + '</p>');
     L += section('Highlights', liList(c.highlights, '✦', 'sd-hl'));
     L += section("What's included", incBlock);
     L += section(isShop ? 'How it works' : 'What to expect', stepsHtml(c.steps));
@@ -190,6 +192,12 @@
 
     var host = document.getElementById('detail-body');
     if (host) host.innerHTML = '<div class="two"><div>' + L + '</div><div>' + R + '</div></div>';
+    try {
+      var pv = document.getElementById('public-view'); if (pv) pv.classList.add('hidden');
+      var dv = document.getElementById('detail-view'); if (dv) dv.classList.remove('hidden');
+      window.scrollTo(0, 0);
+      setTimeout(function(){ try { window.scrollTo(0, 0); } catch(e){} }, 30);
+    } catch(e){}
   }
 
   function install(){
