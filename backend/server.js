@@ -85,6 +85,28 @@ const PORT = process.env.PORT || 4000
 // enhancement URL so a fresh copy is fetched after every deploy.
 const BUILD_ID = Date.now()
 const PUBLIC_DIR = new URL("./public/", import.meta.url).pathname
+
+// World-class dashboard chrome (server-injected CSS, additive & safe).
+// Restyles the sidebar menu, buttons, header and adds premium shadows across
+// ALL role dashboards. It only overrides visual properties via a <style> tag
+// added to the served HTML; no source file and no behaviour is changed.
+const CHROME_CSS =
+  "#dash-title{font-size:23px;font-weight:800;letter-spacing:-.4px;color:var(--text)}" +
+  "#dnav{display:flex;flex-direction:column;gap:5px}" +
+  "#dnav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 13px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s ease,color .15s ease,transform .15s ease,box-shadow .15s ease}" +
+  "#dnav button svg,#dnav button .ci,#dnav button img{width:19px;height:19px;flex:0 0 auto;opacity:.85}" +
+  "#dnav button:hover{background:var(--soft);color:var(--text);transform:translateX(2px)}" +
+  "#dnav button.on{background:linear-gradient(135deg,var(--blue),var(--blue-h));color:#fff;box-shadow:0 10px 22px rgba(18,59,76,.24)}" +
+  "#dnav button.on svg,#dnav button.on .ci{opacity:1;color:#fff}" +
+  "#dnav button.on:hover{transform:none;color:#fff}" +
+  "#dash-view .btn,#dash-view button.btn{border-radius:10px;font-weight:700;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}" +
+  "#dash-view .btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(18,59,76,.16);filter:brightness(1.03)}" +
+  "#dash-view .btn.primary,#dash-view .btn-primary,#dash-view .btn.blue{background:linear-gradient(135deg,var(--blue),var(--blue-h));border-color:transparent;color:#fff}" +
+  "#dmain button{border-radius:9px;cursor:pointer;transition:box-shadow .15s ease,filter .15s ease}" +
+  "#dmain button:hover{filter:brightness(1.03)}" +
+  ".dp-kpi,.dp-panel{box-shadow:0 1px 2px rgba(18,59,76,.05)}" +
+  ".dp-panel:hover{box-shadow:0 10px 24px rgba(18,59,76,.07)}"
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -106,11 +128,19 @@ async function serveStatic(res, pathname) {
     if (!st.isFile()) return false
     const ext = extname(fp)
 
-    // Serve the HTML shell fresh every time, and guarantee the world-class
-    // dashboard enhancement is always loaded. Both changes are purely additive:
-    // the file on disk is never modified, we only adjust the SERVED response.
+    // Serve the HTML shell fresh every time, guarantee the world-class
+    // dashboard enhancement loads, and inject premium chrome styles. All
+    // changes are purely additive: the file on disk is never modified, we only
+    // adjust the SERVED response.
     if (ext === ".html") {
       let html = (await readFile(fp)).toString("utf8")
+      // Premium chrome styles (menu/buttons/colors) for all dashboards.
+      if (!html.includes('id="rago-chrome"')) {
+        const styleTag = '\n<style id="rago-chrome">' + CHROME_CSS + "</style>\n"
+        if (html.includes("</head>")) html = html.replace("</head>", styleTag + "</head>")
+        else if (html.includes("</body>")) html = html.replace("</body>", styleTag + "</body>")
+        else html = styleTag + html
+      }
       // Force-load dashboard-pro.js with a per-deploy version, independent of
       // any cached demo-trips.js loader or cached dashboard-pro.js. The script
       // is idempotent (it guards against double-install), so this is safe even
