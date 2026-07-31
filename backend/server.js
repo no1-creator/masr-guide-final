@@ -107,6 +107,24 @@ const CHROME_CSS =
   ".dp-kpi,.dp-panel{box-shadow:0 1px 2px rgba(18,59,76,.05)}" +
   ".dp-panel:hover{box-shadow:0 10px 24px rgba(18,59,76,.07)}"
 
+// Autofill guard (server-injected JS, additive & safe). Some browsers dump the
+// saved login email into the public "Search trips" box (#q) because it is a lone
+// text field. This makes #q readonly-until-focus (which browsers never autofill)
+// and clears any email that slipped in, then refreshes the results. It never
+// interferes once the user actually focuses/typing in the box, and no source
+// file is modified — only the SERVED HTML gets this tiny guard.
+const NOFILL_JS =
+  "(function(){function fix(){var q=document.getElementById('q');if(!q)return;" +
+  "if(!q.__ragoInit){q.__ragoInit=1;q.setAttribute('autocomplete','off');" +
+  "q.setAttribute('name','rago_s_'+Math.random().toString(36).slice(2,7));" +
+  "q.setAttribute('readonly','readonly');" +
+  "var unlock=function(){q.__ragoTyped=1;q.removeAttribute('readonly');};" +
+  "q.addEventListener('focus',unlock);q.addEventListener('pointerdown',unlock);}" +
+  "if(!q.__ragoTyped&&q.value&&q.value.indexOf('@')>=0){q.value='';" +
+  "if(window.loadServices){try{loadServices()}catch(e){}}}}" +
+  "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fix);}else{fix();}" +
+  "var n=0,iv=setInterval(function(){fix();if(++n>25){clearInterval(iv);}},140);})();"
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -150,6 +168,14 @@ async function serveStatic(res, pathname) {
         if (html.includes("</body>")) html = html.replace("</body>", tag + "</body>")
         else if (html.includes("</html>")) html = html.replace("</html>", tag + "</html>")
         else html = html + tag
+      }
+      // Stop browser autofill from dumping the saved login email into the public
+      // "Search trips" box (#q). Purely additive guard; no source file changed.
+      if (!html.includes('id="rago-nofill"')) {
+        const nf = '\n<script id="rago-nofill">' + NOFILL_JS + "</script>\n"
+        if (html.includes("</body>")) html = html.replace("</body>", nf + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", nf + "</html>")
+        else html = html + nf
       }
       res.writeHead(200, {
         "Content-Type": MIME[ext],
