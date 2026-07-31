@@ -178,6 +178,15 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", ap + "</html>")
         else html = html + ap
       }
+      // Load the Provider & Marketer control enhancements (dash-plus.js).
+      // Self-contained; chains after admin-pro.js. Purely additive, no source
+      // file changed.
+      if (!html.includes("dash-plus.js?b=")) {
+        const dpx = '\n<script src="dash-plus.js?b=' + BUILD_ID + '"></script>\n'
+        if (html.includes("</body>")) html = html.replace("</body>", dpx + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", dpx + "</html>")
+        else html = html + dpx
+      }
       // Stop browser autofill from dumping the saved login email into the public
       // "Search trips" box (#q). Purely additive guard; no source file changed.
       if (!html.includes('id="rago-nofill"')) {
