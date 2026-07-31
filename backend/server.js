@@ -102,9 +102,19 @@ async function serveStatic(res, pathname) {
     const st = await stat(fp)
     if (!st.isFile()) return false
     const buf = await readFile(fp)
-    res.writeHead(200, {
-      "Content-Type": MIME[extname(fp)] || "application/octet-stream",
-    })
+    const ext = extname(fp)
+    const headers = {
+      "Content-Type": MIME[ext] || "application/octet-stream",
+    }
+    // Never cache the HTML shell or its JS bundles, so new deploys and
+    // dashboard enhancements always reach users immediately. This is purely
+    // additive: it only sets a response header and never changes file
+    // contents, routing, or any existing behaviour. Images/other assets keep
+    // their default behaviour.
+    if (ext === ".html" || ext === ".js") {
+      headers["Cache-Control"] = "no-store, must-revalidate"
+    }
+    res.writeHead(200, headers)
     res.end(buf)
     return true
   } catch {
