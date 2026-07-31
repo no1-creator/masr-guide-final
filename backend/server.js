@@ -81,6 +81,9 @@ function matchRoute(method, pathname) {
 }
 
 const PORT = process.env.PORT || 4000
+// A unique id per server start (per deploy). Used to version the dashboard
+// enhancement URL so a fresh copy is fetched after every deploy.
+const BUILD_ID = Date.now()
 const PUBLIC_DIR = new URL("./public/", import.meta.url).pathname
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -101,19 +104,37 @@ async function serveStatic(res, pathname) {
     if (!fp.startsWith(PUBLIC_DIR)) return false
     const st = await stat(fp)
     if (!st.isFile()) return false
-    const buf = await readFile(fp)
     const ext = extname(fp)
+
+    // Serve the HTML shell fresh every time, and guarantee the world-class
+    // dashboard enhancement is always loaded. Both changes are purely additive:
+    // the file on disk is never modified, we only adjust the SERVED response.
+    if (ext === ".html") {
+      let html = (await readFile(fp)).toString("utf8")
+      // Force-load dashboard-pro.js with a per-deploy version, independent of
+      // any cached demo-trips.js loader or cached dashboard-pro.js. The script
+      // is idempotent (it guards against double-install), so this is safe even
+      // when the existing loader also runs.
+      if (!html.includes("dashboard-pro.js?b=")) {
+        const tag = '\n<script src="dashboard-pro.js?b=' + BUILD_ID + '"></script>\n'
+        if (html.includes("</body>")) html = html.replace("</body>", tag + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", tag + "</html>")
+        else html = html + tag
+      }
+      res.writeHead(200, {
+        "Content-Type": MIME[ext],
+        "Cache-Control": "no-store, must-revalidate",
+      })
+      res.end(html)
+      return true
+    }
+
+    const buf = await readFile(fp)
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
     }
-    // Never cache the HTML shell or its JS bundles, so new deploys and
-    // dashboard enhancements always reach users immediately. This is purely
-    // additive: it only sets a response header and never changes file
-    // contents, routing, or any existing behaviour. Images/other assets keep
-    // their default behaviour.
-    if (ext === ".html" || ext === ".js") {
-      headers["Cache-Control"] = "no-store, must-revalidate"
-    }
+    // Never cache JS bundles so updates reach users immediately.
+    if (ext === ".js") headers["Cache-Control"] = "no-store, must-revalidate"
     res.writeHead(200, headers)
     res.end(buf)
     return true
