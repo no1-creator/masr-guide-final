@@ -399,3 +399,89 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+/* ===================================================================
+ * RaGo — Demo one-click login panel (frontend-only helper)
+ * Adds quick sign-in buttons for every role to the login modal so all
+ * dashboards & features can be reviewed without typing credentials.
+ * Self-contained: only augments the existing login modal + globals
+ * (api / finishAuth / toast) defined in app.html. Nothing else changes.
+ * =================================================================== */
+(function () {
+  'use strict';
+
+  var ACCOUNTS = [
+    { icon: '🛡️', label: 'Admin',            sub: 'Full platform control', email: 'admin@masrguide.com', pass: 'admin123' },
+    { icon: '🏪', label: 'Service provider', sub: 'Vendor dashboard',      email: 'vendor@rodina.com',   pass: 'vendor123' },
+    { icon: '📣', label: 'Marketer',         sub: 'Affiliate & QR links',  email: 'ivan@aff.com',        pass: 'aff123' },
+    { icon: '🧳', label: 'Traveller',        sub: 'Customer view',         email: 'tourist@example.com', pass: 'tourist123' }
+  ];
+
+  // One-click login using the site's existing api() + finishAuth() globals.
+  window.quickLogin = async function (email, password) {
+    try {
+      if (typeof api !== 'function') return;
+      var r = await api('/api/auth/login', { method: 'POST', body: { email: email, password: password } });
+      if (typeof finishAuth === 'function') { finishAuth(r); return; }
+      localStorage.setItem('mg_token', r.token);
+      localStorage.setItem('mg_user', JSON.stringify(r.user));
+      location.reload();
+    } catch (e) {
+      var msg = (e && e.message) ? e.message : e;
+      if (typeof toast === 'function') toast('Demo login failed: ' + msg);
+      else alert('Demo login failed: ' + msg);
+    }
+  };
+
+  function build() {
+    var modal = document.querySelector('#login-modal .modal');
+    if (!modal) return false;
+    if (document.getElementById('rago-demo-access')) return true;
+
+    var box = document.createElement('div');
+    box.id = 'rago-demo-access';
+    box.style.cssText = 'margin-top:16px;border-top:1px dashed var(--border);padding-top:14px';
+
+    var title = document.createElement('div');
+    title.textContent = 'Demo access · one-click sign in';
+    title.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--orange);margin-bottom:9px';
+    box.appendChild(title);
+
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px';
+    ACCOUNTS.forEach(function (a) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn ghost sm';
+      b.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:9px 12px;height:auto';
+      b.innerHTML = '<span style="font-weight:700">' + a.icon + ' ' + a.label + '</span>' +
+                    '<span style="font-size:11px;font-weight:500;color:var(--text2)">' + a.sub + '</span>';
+      b.onclick = function () { window.quickLogin(a.email, a.pass); };
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+
+    var note = document.createElement('p');
+    note.className = 'muted';
+    note.style.cssText = 'font-size:11px;margin-top:9px';
+    note.textContent = 'Test accounts — for reviewing dashboards & features only.';
+    box.appendChild(note);
+
+    // Hide the old plain-text demo credentials line to avoid duplication.
+    var ps = modal.querySelectorAll('p.muted');
+    for (var i = 0; i < ps.length; i++) {
+      if ((ps[i].textContent || '').indexOf('Demo: admin@masrguide.com') !== -1) { ps[i].style.display = 'none'; break; }
+    }
+
+    modal.appendChild(box);
+    return true;
+  }
+
+  function boot() {
+    if (build()) return;
+    var n = 0;
+    var iv = setInterval(function () { if (build() || ++n > 40) clearInterval(iv); }, 200);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
