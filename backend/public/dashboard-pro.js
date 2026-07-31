@@ -1,17 +1,22 @@
 /* =====================================================================
- * RaGo — World-class dashboards (frontend-only enhancement)
+ * RaGo — World-class dashboards (frontend-only enhancement, v2)
  * Upgrades the Admin / Vendor / Marketer dashboard OVERVIEW screens with
  * premium KPI cards, growth/decline trend indicators, sparklines and
  * report panels (revenue chart + booking-status breakdown).
  *
- * SAFE & ADDITIVE: only augments the existing global `SEC` overview
- * renderers and injects its own namespaced CSS (.dp-*). It does NOT touch
- * any working code, the backend, or any other dashboard section. Every
- * figure is computed live from the existing API — no fake data.
+ * SAFE & ADDITIVE: it WRAPS the global loadSec() renderer. For the Overview
+ * screen of admin/vendor/affiliate it renders the enhanced view; every OTHER
+ * section and role falls through to the ORIGINAL renderer untouched. If
+ * anything fails it silently falls back to the original, so no working
+ * behaviour can break. All figures are computed live from the existing API.
+ *
+ * Why wrap loadSec (not SEC): app.html declares `const SEC` (and the render
+ * helpers) as SCRIPT-LOCAL bindings that an external file cannot reach, which
+ * is why the first version had no effect. `loadSec` is a global function
+ * declaration, so it CAN be wrapped from here reliably.
  * ===================================================================== */
 (function () {
   'use strict';
-  if (typeof SEC === 'undefined') return; // needs app.html globals
 
   /* ---------- 1) Namespaced styles (.dp-*) ---------- */
   var CSS = [
@@ -59,17 +64,26 @@
     '.dp-bg-cancelled{background:var(--red)}',
     '@media(max-width:760px){.dp-panels{grid-template-columns:1fr}}'
   ].join('\n');
-  if (!document.getElementById('dp-styles-inject')) {
+  function injectStyles(){
+    if (document.getElementById('dp-styles-inject')) return;
     var st = document.createElement('style');
     st.id = 'dp-styles-inject';
     st.textContent = CSS;
-    document.head.appendChild(st);
+    (document.head || document.documentElement).appendChild(st);
   }
 
-  /* ---------- 2) Helpers ---------- */
-  function money2(n){ return (typeof money === 'function') ? money(n) : ('$' + Number(n||0).toLocaleString()); }
-  function icon(n){ return (typeof iconSvg === 'function') ? iconSvg(n) : ''; }
-  function mkey(d){ var x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0'); }
+  /* ---------- 2) Helpers (all reference GLOBAL functions safely) ---------- */
+  function money2(n){ return (typeof window.money === 'function') ? window.money(n) : ('$' + Number(n||0).toLocaleString()); }
+  function icon(n){ return (typeof window.iconSvg === 'function') ? window.iconSvg(n) : ''; }
+  function esc2(s){ return (typeof window.esc === 'function') ? window.esc(s) : String(s==null?'':s); }
+  function tbl2(h,r){ return (typeof window.tbl === 'function') ? window.tbl(h,r) : ''; }
+  function statusTag2(s){ return (typeof window.statusTag === 'function') ? window.statusTag(s) : String(s==null?'':s); }
+  function bookingsTable2(b){ return (typeof window.bookingsTable === 'function') ? window.bookingsTable(b) : ''; }
+  function apiGet(p){ return window.api(p); }
+  function safeArr(p){ return window.api(p).then(function(x){ return x || []; }).catch(function(){ return []; }); }
+  function safeWallet(p){ return window.api(p).catch(function(){ return {balance:0, transactions:[]}; }); }
+
+  function mkey(d){ var x = new Date(d); if (isNaN(x.getTime())) return ''; return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0'); }
   function lastMonths(n){
     var a = [], now = new Date();
     for (var i = n-1; i >= 0; i--) {
@@ -106,7 +120,7 @@
       + '<path d="' + area + '" fill="url(#' + id + ')"/><path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
   function bars(series, tone){
-    var max = Math.max.apply(null, series.map(function(s){return s.value;}).concat([1]));
+    var max = Math.max.apply(null, series.map(function(s){ return s.value; }).concat([1]));
     var col = {blue:'#123B4C',green:'#2E8B7B',gold:'#E8850F'}[tone||'blue'];
     return '<div class="dp-bars">' + series.map(function(s){
       var pct = Math.round((s.value / max) * 100);
@@ -130,39 +144,39 @@
     return '<div class="dp-panel"><div class="dp-panel-h"><div class="dp-panel-t">' + title + '</div>' + (sub ? '<div class="dp-panel-s">' + sub + '</div>' : '') + '</div>' + body + '</div>';
   }
   var PAID = function(b){ return b.status === 'confirmed' || b.status === 'completed'; };
-  function safeArr(p){ return api(p).catch(function(){ return []; }); }
-  function safeWallet(p){ return api(p).catch(function(){ return {balance:0, transactions:[]}; }); }
 
-  /* ---------- 3) Overview renderers (override) ---------- */
-  SEC['admin:overview'] = async function(m){
-    var res = await Promise.all([ api('/api/admin/overview'), safeArr('/api/bookings') ]);
-    var o = res[0], bk = res[1] || [];
+  /* ---------- 3) Enhanced overview renderers ---------- */
+  async function renderAdmin(m){
+    var res = await Promise.all([ apiGet('/api/admin/overview'), safeArr('/api/bookings') ]);
+    var o = res[0] || {}, bk = res[1] || [];
     var months = lastMonths(6);
     var rev = months.map(function(mo){ return { label: mo.label, value: bk.filter(function(b){ return PAID(b) && mkey(b.created_at) === mo.key; }).reduce(function(s,b){ return s + Number(b.amount||0); }, 0) }; });
     var cnt = months.map(function(mo){ return bk.filter(function(b){ return mkey(b.created_at) === mo.key; }).length; });
     var rc = rev[5].value, rp = rev[4].value, cc = cnt[5], cp = cnt[4];
+    var recent = o.recent_bookings || [];
+    var tops = o.top_affiliates || [];
     m.innerHTML =
       '<div class="dp-kpis">'
-      + kpi({icon:'wallet', tone:'green', label:'Revenue', value:money2(o.revenue), trend:trendBadge(rc,rp), spark:spark(rev.map(function(r){return r.value;}),'green')})
-      + kpi({icon:'ticket', tone:'blue', label:'Bookings', value:o.bookings, trend:trendBadge(cc,cp), spark:spark(cnt,'blue')})
+      + kpi({icon:'wallet', tone:'green', label:'Revenue', value:money2(o.revenue), trend:trendBadge(rc,rp), spark:spark(rev.map(function(r){ return r.value; }),'green')})
+      + kpi({icon:'ticket', tone:'blue', label:'Bookings', value:(o.bookings!=null?o.bookings:bk.length), trend:trendBadge(cc,cp), spark:spark(cnt,'blue')})
       + kpi({icon:'sparkles', tone:'gold', label:'Platform commission', value:money2(o.platform_commission)})
-      + kpi({icon:'wallet', tone:(o.pending_payouts>0?'gold':'blue'), label:'Pending payouts', value:o.pending_payouts})
-      + kpi({icon:'store', tone:'blue', label:'Providers', value:o.vendors})
-      + kpi({icon:'megaphone', tone:'blue', label:'Marketers', value:o.affiliates})
-      + kpi({icon:'users', tone:'blue', label:'Customers', value:o.customers})
-      + kpi({icon:'compass', tone:'blue', label:'Services', value:o.services})
+      + kpi({icon:'wallet', tone:(o.pending_payouts>0?'gold':'blue'), label:'Pending payouts', value:(o.pending_payouts!=null?o.pending_payouts:0)})
+      + kpi({icon:'store', tone:'blue', label:'Providers', value:(o.vendors!=null?o.vendors:0)})
+      + kpi({icon:'megaphone', tone:'blue', label:'Marketers', value:(o.affiliates!=null?o.affiliates:0)})
+      + kpi({icon:'users', tone:'blue', label:'Customers', value:(o.customers!=null?o.customers:0)})
+      + kpi({icon:'compass', tone:'blue', label:'Services', value:(o.services!=null?o.services:0)})
       + '</div>'
       + '<div class="dp-panels">'
       + panel('Revenue', 'Last 6 months \u00b7 confirmed &amp; completed', bars(rev,'green'))
       + panel('Bookings by status', 'All-time distribution', breakdown(bk))
       + '</div>'
       + '<div class="dp-panels">'
-      + panel('Recent bookings', 'Latest activity', tbl(['Ref','Trip','Amount','Status'], o.recent_bookings.map(function(b){ return [b.ref, esc(b.title), money2(b.amount), statusTag(b.status)]; })))
-      + panel('Top marketers', 'By bookings &amp; clicks', tbl(['Name','Code','Clicks','Bookings'], o.top_affiliates.map(function(a){ return [esc(a.name), a.code, a.clicks, a.bookings]; })))
+      + panel('Recent bookings', 'Latest activity', tbl2(['Ref','Trip','Amount','Status'], recent.map(function(b){ return [b.ref, esc2(b.title), money2(b.amount), statusTag2(b.status)]; })))
+      + panel('Top marketers', 'By bookings &amp; clicks', tbl2(['Name','Code','Clicks','Bookings'], tops.map(function(a){ return [esc2(a.name), a.code, a.clicks, a.bookings]; })))
       + '</div>';
-  };
+  }
 
-  SEC['vendor:overview'] = async function(m){
+  async function renderVendor(m){
     var res = await Promise.all([ safeArr('/api/bookings'), safeWallet('/api/wallets/me') ]);
     var bk = res[0] || [], w = res[1] || {balance:0};
     var months = lastMonths(6);
@@ -173,7 +187,7 @@
     var rate = bk.length ? Math.round((completed / bk.length) * 100) : 0;
     m.innerHTML =
       '<div class="dp-kpis">'
-      + kpi({icon:'wallet', tone:'green', label:'Gross sales', value:money2(gross), trend:trendBadge(rev[5].value,rev[4].value), spark:spark(rev.map(function(r){return r.value;}),'green')})
+      + kpi({icon:'wallet', tone:'green', label:'Gross sales', value:money2(gross), trend:trendBadge(rev[5].value,rev[4].value), spark:spark(rev.map(function(r){ return r.value; }),'green')})
       + kpi({icon:'ticket', tone:'blue', label:'Bookings', value:bk.length, trend:trendBadge(cnt[5],cnt[4]), spark:spark(cnt,'blue')})
       + kpi({icon:'wallet', tone:'gold', label:'Wallet balance', value:money2(w.balance)})
       + kpi({icon:'star', tone:'blue', label:'Completion rate', value:rate + '%'})
@@ -182,11 +196,11 @@
       + panel('Revenue', 'Last 6 months', bars(rev,'green'))
       + panel('Bookings by status', 'All-time', breakdown(bk))
       + '</div>'
-      + panel('Recent bookings', 'Latest activity', bookingsTable(bk.slice(0,8)));
-  };
+      + panel('Recent bookings', 'Latest activity', bookingsTable2(bk.slice(0,8)));
+  }
 
-  SEC['affiliate:overview'] = async function(m){
-    var res = await Promise.all([ api('/api/affiliates/me'), safeArr('/api/bookings'), safeWallet('/api/wallets/me') ]);
+  async function renderAffiliate(m){
+    var res = await Promise.all([ apiGet('/api/affiliates/me'), safeArr('/api/bookings'), safeWallet('/api/wallets/me') ]);
     var a = res[0] || {clicks:0}, bk = res[1] || [], w = res[2] || {balance:0, transactions:[]};
     var months = lastMonths(6);
     var earn = months.map(function(mo){ return { label: mo.label, value: (w.transactions||[]).filter(function(t){ return t.amount > 0 && mkey(t.created_at) === mo.key; }).reduce(function(s,t){ return s + Number(t.amount||0); }, 0) }; });
@@ -194,14 +208,58 @@
     var conv = a.clicks ? Math.round((bk.length / a.clicks) * 100) : 0;
     m.innerHTML =
       '<div class="dp-kpis">'
-      + kpi({icon:'wallet', tone:'green', label:'Earnings', value:money2(w.balance), trend:trendBadge(earn[5].value,earn[4].value), spark:spark(earn.map(function(r){return r.value;}),'green')})
+      + kpi({icon:'wallet', tone:'green', label:'Earnings', value:money2(w.balance), trend:trendBadge(earn[5].value,earn[4].value), spark:spark(earn.map(function(r){ return r.value; }),'green')})
       + kpi({icon:'ticket', tone:'blue', label:'Bookings', value:bk.length, trend:trendBadge(cnt[5],cnt[4]), spark:spark(cnt,'blue')})
-      + kpi({icon:'link', tone:'gold', label:'Clicks', value:a.clicks})
+      + kpi({icon:'link', tone:'gold', label:'Clicks', value:(a.clicks!=null?a.clicks:0)})
       + kpi({icon:'sparkles', tone:'blue', label:'Conversion', value:conv + '%'})
       + '</div>'
       + '<div class="dp-panels">'
       + panel('Earnings', 'Last 6 months', bars(earn,'green'))
       + panel('Bookings by status', 'All-time', breakdown(bk))
       + '</div>';
-  };
+  }
+
+  /* ---------- 4) Context detection (no dependency on script-local vars) ---------- */
+  function currentRole(){
+    var t = (document.getElementById('dash-title') || {}).textContent || '';
+    if (/Admin/i.test(t)) return 'admin';
+    if (/Provider/i.test(t)) return 'vendor';
+    if (/Marketer/i.test(t)) return 'affiliate';
+    return '';
+  }
+  function currentSection(){
+    var b = document.querySelector('#dnav button.on');
+    if (!b) return '';
+    var s = b.querySelector('span');
+    return (s ? s.textContent : (b.textContent || '')).trim().toLowerCase();
+  }
+
+  /* ---------- 5) Wrap the global loadSec() ---------- */
+  function install(){
+    if (window.__ragoDpInstalled) return true;
+    if (typeof window.loadSec !== 'function') return false;
+    injectStyles();
+    var _orig = window.loadSec;
+    window.loadSec = async function(){
+      var role = currentRole(), sec = currentSection();
+      if (sec === 'overview' && (role === 'admin' || role === 'vendor' || role === 'affiliate')) {
+        var m = document.getElementById('dmain');
+        if (m) {
+          try {
+            m.innerHTML = '<p class="muted">Loading...</p>';
+            if (role === 'admin') { await renderAdmin(m); return; }
+            if (role === 'vendor') { await renderVendor(m); return; }
+            await renderAffiliate(m); return;
+          } catch (e) { /* fall back to the original renderer below */ }
+        }
+      }
+      return _orig.apply(this, arguments);
+    };
+    window.__ragoDpInstalled = true;
+    return true;
+  }
+  if (!install()) {
+    var tries = 0;
+    var iv = setInterval(function(){ if (install() || ++tries > 80) clearInterval(iv); }, 120);
+  }
 })();
