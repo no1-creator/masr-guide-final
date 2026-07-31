@@ -245,6 +245,20 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Demo one-tap sign in using the seeded test accounts, so every role and
+  // dashboard can be reviewed quickly without typing credentials.
+  Future<void> _quickLogin(String email, String password) async {
+    setState(() { _busy = true; _error = null; });
+    try {
+      await _st.login(email, password);
+      _done();
+    } catch (e) {
+      setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final body = ListView(
@@ -294,6 +308,39 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(width: 12),
           Expanded(child: _socialBtn('Apple', Icons.apple_rounded, () => _socialSoon('Apple'))),
         ]),
+
+        // ---- Demo access: one-tap sign in for every role ----
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.soft,
+            borderRadius: BorderRadius.circular(kRadius),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('DEMO ACCESS · ONE-TAP SIGN IN',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.orange)),
+              const SizedBox(height: 4),
+              const Text('Review every dashboard & feature without typing credentials.',
+                  style: TextStyle(fontSize: 12, color: AppColors.text2)),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(child: _demoBtn('🛡️ Admin', 'admin@masrguide.com', 'admin123')),
+                const SizedBox(width: 8),
+                Expanded(child: _demoBtn('🏪 Provider', 'vendor@rodina.com', 'vendor123')),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _demoBtn('📣 Marketer', 'ivan@aff.com', 'aff123')),
+                const SizedBox(width: 8),
+                Expanded(child: _demoBtn('🧳 Traveller', 'tourist@example.com', 'tourist123')),
+              ]),
+            ],
+          ),
+        ),
       ],
     );
     if (widget.embedded) return SafeArea(child: body);
@@ -413,5 +460,16 @@ class _LoginScreenState extends State<LoginScreen> {
         icon: Icon(icon, size: 22, color: AppColors.blue),
         label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         onPressed: _busy ? null : onTap,
+      );
+
+  Widget _demoBtn(String label, String email, String password) => OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.blue,
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: AppColors.border),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+        ),
+        onPressed: _busy ? null : () => _quickLogin(email, password),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
       );
 }
