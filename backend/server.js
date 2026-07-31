@@ -202,6 +202,15 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", sdp + "</html>")
         else html = html + sdp
       }
+      // Load the world-class public homepage enhancer (home-pro.js): richer
+      // service cards, trust strip, professional footer and back-to-top. Wraps
+      // loadServices(); purely additive, no source file changed.
+      if (!html.includes("home-pro.js?b=")) {
+        const hp = '\n<script src="home-pro.js?b=' + BUILD_ID + '"></script>\n'
+        if (html.includes("</body>")) html = html.replace("</body>", hp + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", hp + "</html>")
+        else html = html + hp
+      }
       // Stop browser autofill from dumping the saved login email into the public
       // "Search trips" box (#q). Purely additive guard; no source file changed.
       if (!html.includes('id="rago-nofill"')) {
