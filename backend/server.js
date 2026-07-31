@@ -169,6 +169,15 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", tag + "</html>")
         else html = html + tag
       }
+      // Load the Admin control center (providers / services / bookings
+      // management). Self-contained file that chains after dashboard-pro.js;
+      // purely additive, no source file changed.
+      if (!html.includes("admin-pro.js?b=")) {
+        const ap = '\n<script src="admin-pro.js?b=' + BUILD_ID + '"></script>\n'
+        if (html.includes("</body>")) html = html.replace("</body>", ap + "</body>")
+        else if (html.includes("</html>")) html = html.replace("</html>", ap + "</html>")
+        else html = html + ap
+      }
       // Stop browser autofill from dumping the saved login email into the public
       // "Search trips" box (#q). Purely additive guard; no source file changed.
       if (!html.includes('id="rago-nofill"')) {
