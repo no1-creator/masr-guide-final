@@ -124,6 +124,13 @@ export function migrate() {
     active INTEGER DEFAULT 1, position INTEGER DEFAULT 0
   );
   `)
+
+	// Additive & idempotent: per-booking custom form details (JSON string).
+	// Different services need different booking fields; this column stores them.
+	// Throws if the column already exists, which we safely ignore.
+	try {
+		db.exec("ALTER TABLE bookings ADD COLUMN details TEXT")
+	} catch (e) {}
 }
 
 // Tiny query helpers.
