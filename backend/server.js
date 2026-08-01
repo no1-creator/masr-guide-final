@@ -5,6 +5,7 @@ import { extname, join } from "node:path"
 import { migrate, get, all, run } from "./src/db.js"
 import { seed } from "./src/seed.js"
 import { topupCatalog } from "./src/topup.js"
+import { enrichCatalog } from "./src/enrich.js"
 import { verifyToken, bearer } from "./src/auth.js"
 import { sendJSON, preflight, readBody, parseQuery, HttpError } from "./src/util.js"
 
@@ -28,11 +29,11 @@ run(
   "pharmacy",
   JSON.stringify({
     en: "Pharmacy & Health",
-    fr: "Pharmacie & sant\u00e9",
+    fr: "Pharmacie & santé",
     de: "Apotheke & Gesundheit",
     it: "Farmacia & salute",
     es: "Farmacia y salud",
-    ru: "\u0410\u043f\u0442\u0435\u043a\u0430 \u0438 \u0437\u0434\u043e\u0440\u043e\u0432\u044c\u0435",
+    ru: "Аптека и здоровье",
   }),
 )
 
@@ -92,6 +93,14 @@ try {
   topupCatalog()
 } catch (e) {
   console.error("[topup] skipped:", (e && e.message) || e)
+}
+
+// Fill empty detail pages with reviews + availability and give hotels a real
+// per-night price (idempotent, additive).
+try {
+  enrichCatalog()
+} catch (e) {
+  console.error("[enrich] skipped:", (e && e.message) || e)
 }
 
 const ROUTES = [
