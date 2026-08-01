@@ -268,3 +268,114 @@
   l.href = '/rgt-theme.css?v=1'
   ;(document.head || document.documentElement).appendChild(l)
 })()
+
+/* RaGo - Provider (vendor) dashboard upgrades (additive, isolated).
+ * Overrides only the vendor:* dashboard panels to be richer and more
+ * professional, and lets a provider hand each marketer a personal referral
+ * link + QR code. Admin and affiliate panels are untouched. */
+(function () {
+  'use strict'
+  if (typeof SEC === 'undefined') return
+
+  function stat(n, l) { return '<div class="stat"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>' }
+  function num(x) { return Number(x) || 0 }
+
+  SEC['vendor:overview'] = async function (m) {
+    await ensureCats()
+    var b = await api('/api/bookings')
+    var w = await api('/api/wallets/me').catch(function () { return { balance: 0 } })
+    var me = await api('/api/vendors/me').catch(function () { return null })
+    var all = await api('/api/services').catch(function () { return [] })
+    var mine = me ? all.filter(function (s) { return s.vendor_id === me.id }) : all
+    var gross = b.reduce(function (s, x) { return s + num(x.amount) }, 0)
+    var pending = b.filter(function (x) { return x.status === 'pending' }).length
+    var done = b.filter(function (x) { return x.status === 'confirmed' || x.status === 'completed' }).length
+    var rated = mine.filter(function (s) { return num(s.rating) > 0 })
+    var avg = rated.length ? Math.round((rated.reduce(function (s, x) { return s + num(x.rating) }, 0) / rated.length) * 10) / 10 : 0
+    m.innerHTML = '<div class="stats">'
+      + stat(mine.length, 'My services')
+      + stat(b.length, 'Bookings')
+      + stat(pending, 'Pending')
+      + stat(done, 'Confirmed / done')
+      + stat(money(gross), 'Gross sales')
+      + stat(money(w.balance), 'Wallet balance')
+      + stat(avg ? ('\u2605 ' + avg) : '\u2014', 'Avg rating')
+      + '</div>'
+      + '<h3 style="margin:6px 0 8px">Recent bookings</h3>'
+      + bookingsTable(b.slice(0, 8))
+  }
+
+  SEC['vendor:services'] = async function (m) {
+    await ensureCats()
+    var all = await api('/api/services')
+    var me = await api('/api/vendors/me').catch(function () { return null })
+    var mine = me ? all.filter(function (s) { return s.vendor_id === me.id }) : all
+    m.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap"><h3 style="margin:0">My services (' + mine.length + ')</h3><button class="btn sm" onclick="openService()">+ New service</button></div>'
+      + tbl(['Title', 'Category', 'Price', 'Rating', 'Images', 'Featured', 'Action'], mine.map(function (s) {
+        return [
+          esc(s.title),
+          catName(s.category_id),
+          money(s.price),
+          '\u2605 ' + (s.rating || 0) + ' <span class="muted">(' + (s.reviews_count || 0) + ')</span>',
+          (s.images ? s.images.length : 0),
+          s.featured ? '<span class="tag confirmed">Featured</span>' : '\u2014',
+          '<button class="btn sm ghost" onclick="openService(' + s.id + ')">Edit</button> <button class="btn sm danger" onclick="delService(' + s.id + ')">Delete</button>'
+        ]
+      }))
+  }
+
+  SEC['vendor:marketers'] = async function (m) {
+    var a = await api('/api/affiliates')
+    m.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px;flex-wrap:wrap"><h3 style="margin:0">My marketers (' + a.length + ')</h3><button class="btn sm" onclick="openModal(\'mkt-modal\')">+ New marketer</button></div>'
+      + '<p class="muted" style="margin:0 0 12px">Give each marketer a personal link or QR code. Every booking made through it earns them commission automatically.</p>'
+      + tbl(['Name', 'Code', 'Rate', 'Clicks', 'Link / QR', 'Action'], a.map(function (x) {
+        return [
+          esc(x.name),
+          '<code>' + esc(x.code) + '</code>',
+          (num(x.commission_rate) * 100) + '%',
+          x.clicks,
+          '<button class="btn sm ghost" onclick="rgtMkLink(' + x.id + ')">Get link &amp; QR</button>',
+          '<button class="btn sm danger" onclick="delAff(' + x.id + ')">Remove</button>'
+        ]
+      }))
+  }
+
+  window.rgtMkLink = async function (id) {
+    try {
+      var list = await api('/api/affiliates')
+      var a = null
+      for (var i = 0; i < list.length; i++) { if (list[i].id === id) { a = list[i]; break } }
+      if (!a) { toast('Marketer not found'); return }
+      var link = a.link || (location.origin + '/?ref=' + encodeURIComponent(a.code))
+      window.rgtShowLinkModal(a.name, a.code, link)
+    } catch (e) { toast(e.message) }
+  }
+
+  window.rgtShowLinkModal = function (name, code, link) {
+    var ov = document.getElementById('rgt-mk-ov')
+    if (!ov) {
+      ov = document.createElement('div')
+      ov.id = 'rgt-mk-ov'
+      ov.className = 'overlay'
+      ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('on') })
+      document.body.appendChild(ov)
+    }
+    var qr = (typeof qrSvg === 'function') ? qrSvg(link) : ''
+    ov.innerHTML = '<div class="modal" style="max-width:420px;width:100%;text-align:center">'
+      + '<h3 style="margin:0 0 4px">' + esc(name) + '</h3>'
+      + '<p class="muted" style="margin:0 0 14px">Referral code: <code>' + esc(code) + '</code></p>'
+      + '<div style="display:flex;justify-content:center;margin-bottom:14px">' + qr + '</div>'
+      + '<div class="linkbox"><input id="rgt-mk-in" value="' + esc(link) + '" readonly><button class="btn" onclick="rgtCopyMk()">Copy</button></div>'
+      + '<button class="btn ghost" style="margin-top:14px;width:100%" onclick="document.getElementById(\'rgt-mk-ov\').classList.remove(\'on\')">Close</button>'
+      + '</div>'
+    ov.classList.add('on')
+  }
+
+  window.rgtCopyMk = function () {
+    var el = document.getElementById('rgt-mk-in')
+    if (!el) return
+    el.select()
+    try { navigator.clipboard.writeText(el.value) } catch (e) {}
+    toast('Link copied')
+  }
+})()
