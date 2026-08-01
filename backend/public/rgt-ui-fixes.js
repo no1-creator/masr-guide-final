@@ -490,3 +490,59 @@
     ov.classList.add('on')
   }
 })()
+
+/* RaGo - Customer "My Trips" dashboard (additive, isolated).
+ * Customers had no dashboard. This gives them a "My Trips" header button that
+ * opens their own bookings (stats + list + details viewer), reusing the
+ * existing dash-view shell. Non-customer roles are unaffected. */
+(function () {
+  'use strict'
+  if (typeof renderAuth !== 'function') return
+
+  function num(x) { return Number(x) || 0 }
+  function stat(n, l) { return '<div class="stat"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>' }
+
+  var DEFAULT_DASH = (function () { var db = document.getElementById('dash-btn'); return (db && db.textContent) ? db.textContent : 'Dashboard' })()
+
+  async function renderMyBookings() {
+    var m = document.getElementById('dmain')
+    if (!m) return
+    m.innerHTML = '<p class="muted">Loading...</p>'
+    try {
+      var b = await api('/api/bookings')
+      var spent = b.reduce(function (s, x) { return s + num(x.amount) }, 0)
+      var done = b.filter(function (x) { return x.status === 'confirmed' || x.status === 'completed' }).length
+      m.innerHTML = '<div class="stats">'
+        + stat(b.length, 'Total bookings')
+        + stat(done, 'Confirmed / done')
+        + stat(money(spent), 'Total spent')
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 8px"><h3 style="margin:0">My bookings</h3><button class="btn sm ghost" onclick="goHome()">Browse trips</button></div>'
+        + (b.length ? bookingsTable(b) : '<p class="muted">No bookings yet. Browse trips and book your first adventure.</p>')
+    } catch (e) {
+      m.innerHTML = '<p class="muted">' + esc(e.message) + '</p>'
+    }
+  }
+
+  window.rgtMyTrips = function () {
+    if (!USER) { openLogin(); return }
+    var t = document.getElementById('dash-title')
+    if (t) t.textContent = 'My Trips'
+    var nav = document.getElementById('dnav')
+    if (nav) nav.innerHTML = '<button class="on">' + iconSvg('ticket') + '<span>My Bookings</span></button>'
+    show('dash-view')
+    renderMyBookings()
+  }
+
+  var _renderAuth = renderAuth
+  window.renderAuth = function () {
+    _renderAuth()
+    try {
+      var db = document.getElementById('dash-btn')
+      if (!db) return
+      if (USER && USER.role === 'customer') { db.classList.remove('hidden'); db.textContent = 'My Trips'; db.onclick = window.rgtMyTrips }
+      else if (USER) { db.textContent = DEFAULT_DASH; db.onclick = function () { openDash() } }
+    } catch (e) {}
+  }
+  window.renderAuth()
+})()
