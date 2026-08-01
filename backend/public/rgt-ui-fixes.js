@@ -257,3 +257,14 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start)
   else start()
 })()
+
+/* RaGo - load global world-class theme polish (additive, isolated CSS). */
+(function () {
+  'use strict'
+  if (document.getElementById('rgt-theme-link')) return
+  var l = document.createElement('link')
+  l.id = 'rgt-theme-link'
+  l.rel = 'stylesheet'
+  l.href = '/rgt-theme.css?v=1'
+  ;(document.head || document.documentElement).appendChild(l)
+})()

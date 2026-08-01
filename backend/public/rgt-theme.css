@@ -1,0 +1,159 @@
+/* RaGo global theme polish - world-class UI/UX layer (additive, isolated).
+   Loaded after app.html base styles, so these refinements win by source order.
+   app.html and the frozen category engine (.eg-*) are never edited here. */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+:root{
+  --rg-shadow-sm:0 2px 10px rgba(18,59,76,.06);
+  --rg-shadow:0 8px 24px rgba(18,59,76,.10);
+  --rg-shadow-lg:0 20px 48px rgba(18,59,76,.16);
+  --rg-ring:0 0 0 3px rgba(18,59,76,.12);
+}
+
+/* ---- Base typography ---- */
+body{
+  font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+  color:#1B2A30;
+}
+button,input,select,textarea{font-family:inherit}
+::selection{background:#E8850F;color:#fff}
+
+h1,h2,h3,h4{letter-spacing:-.3px}
+h2{font-size:25px;font-weight:800;color:#123B4C}
+.eyebrow{color:#E8850F;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+.muted{color:#6B7B85}
+
+/* ---- Accessibility focus ---- */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid #E8850F;outline-offset:2px;border-radius:8px;
+}
+
+/* ---- Header ---- */
+header{box-shadow:0 1px 0 rgba(18,59,76,.06),0 6px 22px rgba(18,59,76,.05)}
+
+/* ---- Buttons ---- */
+.btn{
+  border-radius:12px;padding:11px 20px;font-weight:700;font-size:14px;letter-spacing:.1px;
+  transition:transform .15s ease,box-shadow .15s ease,background .15s ease,filter .15s ease;
+  box-shadow:0 6px 16px rgba(18,59,76,.16);
+}
+.btn:hover{transform:translateY(-1px);box-shadow:0 12px 24px rgba(18,59,76,.22)}
+.btn:active{transform:translateY(0);box-shadow:0 4px 12px rgba(18,59,76,.18)}
+.btn.ghost{box-shadow:none}
+.btn.ghost:hover{transform:none;box-shadow:none;background:#EDF1F2}
+.btn.sm{padding:8px 14px;font-size:13px;border-radius:10px;box-shadow:none}
+.btn.danger{box-shadow:0 6px 16px rgba(224,85,68,.26)}
+.btn.danger:hover{box-shadow:0 12px 24px rgba(224,85,68,.32)}
+
+/* ---- Chips & tags ---- */
+.chip{font-weight:700;transition:.15s}
+.chip:hover{transform:translateY(-1px)}
+.tag{font-weight:700;letter-spacing:.2px}
+
+/* ---- Category quick filter pills ---- */
+.cat{border-radius:999px;font-weight:700;transition:transform .15s,box-shadow .15s,background .15s}
+.cat:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(18,59,76,.10)}
+
+/* ---- Sliders ---- */
+.slider{border-radius:22px;box-shadow:0 18px 44px rgba(18,59,76,.18);overflow:hidden}
+.slider2{border-radius:18px;box-shadow:0 12px 28px rgba(18,59,76,.12);overflow:hidden}
+.slide .cap h3{font-weight:800;letter-spacing:-.4px}
+.snav{
+  width:42px;height:42px;border-radius:50%;color:#123B4C;font-weight:700;
+  box-shadow:0 8px 18px rgba(8,26,33,.20);transition:transform .15s,background .15s;
+}
+.snav:hover{background:#fff;transform:translateY(-50%) scale(1.08)}
+.dots i{transition:width .2s,background .2s,opacity .2s}
+
+/* ---- Category cards (pill cards) ---- */
+.pcard{border-radius:18px;box-shadow:0 6px 18px rgba(18,59,76,.12);transition:transform .18s ease,box-shadow .18s ease}
+.pcard:hover{transform:translateY(-4px);box-shadow:0 18px 34px rgba(18,59,76,.22)}
+.pcard span{font-weight:800;letter-spacing:.1px}
+.pcard.on{box-shadow:0 10px 24px rgba(18,59,76,.26)}
+
+/* ---- Category tiles ---- */
+.catcard{border-radius:16px;transition:transform .18s,box-shadow .18s,border-color .18s;box-shadow:var(--rg-shadow-sm)}
+.catcard:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(18,59,76,.14)}
+
+/* ---- Filters ---- */
+.filters input,.filters select{
+  border-radius:12px;padding:11px 14px;border:1.5px solid #E4E7E9;background:#fff;
+  transition:border-color .15s,box-shadow .15s;font-weight:600;
+}
+.filters input::placeholder{color:#9aa7ad}
+.filters input:focus,.filters select:focus{outline:none;border-color:#123B4C;box-shadow:var(--rg-ring)}
+
+/* ---- Service cards ---- */
+.card{
+  border-radius:18px;border:1px solid #eef2f4;background:#fff;overflow:hidden;
+  box-shadow:0 2px 12px rgba(18,59,76,.05);transition:transform .2s ease,box-shadow .2s ease,border-color .2s;
+}
+.card:hover{transform:translateY(-5px);box-shadow:0 20px 40px rgba(18,59,76,.15);border-color:#e3e9ec}
+.card .body{padding:15px 16px 17px}
+.card .t{font-weight:800;color:#123B4C;font-size:16px;line-height:1.32}
+.card .price{color:#123B4C;font-weight:800;font-size:17px}
+.card .price small{color:#6B7B85;font-weight:700}
+.card .feat{font-weight:800;box-shadow:0 4px 12px rgba(232,133,15,.40)}
+.star{color:#E8850F;font-weight:800}
+
+/* ---- Legacy detail bits (non-engine) ---- */
+.hero{border-radius:22px;box-shadow:0 14px 34px rgba(18,59,76,.14);overflow:hidden}
+.gth{border-radius:12px}
+.box{border-radius:16px;box-shadow:var(--rg-shadow-sm)}
+
+/* ---- Modals ---- */
+.overlay{background:rgba(8,26,33,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.modal{border-radius:22px;box-shadow:0 30px 72px rgba(8,26,33,.38);padding:26px 26px 24px}
+.modal h3{font-size:21px;font-weight:800;color:#123B4C}
+.field label{font-weight:700;color:#6B7B85;font-size:13px}
+.field input,.field select,.field textarea{
+  border-radius:11px;padding:11px 13px;border:1.5px solid #E4E7E9;
+  transition:border-color .15s,box-shadow .15s;font-weight:600;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#123B4C;box-shadow:var(--rg-ring)}
+
+/* ---- Dashboard ---- */
+.dnav{border-radius:16px;box-shadow:var(--rg-shadow-sm)}
+.dnav button{border-radius:10px;font-weight:700;transition:.12s}
+.stat{
+  border-radius:16px;box-shadow:var(--rg-shadow-sm);border-top:3px solid #E8850F;
+  transition:transform .15s,box-shadow .15s;
+}
+.stat:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(18,59,76,.14)}
+.stat .n{color:#123B4C;font-weight:800}
+
+/* ---- Tables ---- */
+table{border-radius:14px;overflow:hidden;box-shadow:var(--rg-shadow-sm);border-collapse:separate;border-spacing:0}
+th{background:#F7F9FA;font-weight:800;color:#6B7B85;letter-spacing:.02em}
+td,th{padding:12px 15px}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:#F7F9FA}
+
+/* ---- Toast ---- */
+.toast{border-radius:12px;box-shadow:0 14px 32px rgba(8,26,33,.35);font-weight:600;padding:13px 20px}
+
+/* ---- Affiliate link / QR ---- */
+.qr{border-radius:12px}
+.linkbox input{border-radius:9px}
+
+/* ---- Scrollbar polish ---- */
+*{scrollbar-color:#c7d2d7 transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#cbd6da;border-radius:999px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#a9b8be;background-clip:content-box}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+
+/* ---- Mobile refinements ---- */
+@media (max-width:640px){
+  h2{font-size:21px}
+  .btn{padding:10px 16px}
+  .modal{border-radius:18px;padding:20px 18px}
+}
