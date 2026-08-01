@@ -133,6 +133,10 @@ const MIME = {
   ".ico":  "image/x-icon",
 }
 
+// Small script injected into every served HTML page. It adds the RaGo
+// front-end fixes WITHOUT touching app.html.
+const FIX_TAG = '<script src="/rago-fixes.js"></script>'
+
 async function serveStatic(res, pathname) {
   try {
     const rel = pathname === "/" ? "/app.html" : pathname
@@ -140,10 +144,26 @@ async function serveStatic(res, pathname) {
     if (!fp.startsWith(PUBLIC_DIR)) return false
     const st = await stat(fp)
     if (!st.isFile()) return false
+
+    // For HTML we inject the fixes script right before </body>.
+    if (extname(fp) === ".html") {
+      let html = await readFile(fp, "utf8")
+      if (html.indexOf("/rago-fixes.js") === -1) {
+        if (html.indexOf("</body>") !== -1) html = html.replace("</body>", FIX_TAG + "\n</body>")
+        else html += FIX_TAG
+      }
+      res.writeHead(200, {
+        "Content-Type": MIME[".html"],
+        "Cache-Control": "no-store, must-revalidate",
+      })
+      res.end(html)
+      return true
+    }
+
     const buf = await readFile(fp)
     res.writeHead(200, {
       "Content-Type": MIME[extname(fp)] || "application/octet-stream",
-      "Cache-Control": extname(fp) === ".html" ? "no-store, must-revalidate" : "public, max-age=86400",
+      "Cache-Control": "public, max-age=86400",
     })
     res.end(buf)
     return true
