@@ -37,7 +37,7 @@ run(
 run("UPDATE services SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
 run("UPDATE bookings SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
 
-// ─── Fix service images: replace old /img/*.png with real Unsplash photos ────
+// Fix service images: replace old /img/*.png with real Unsplash photos
 const CAT_IMG = {
   airport:        "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80",
   visa:           "https://images.unsplash.com/photo-1618044733300-9472054094ee?w=800&q=80",
@@ -69,13 +69,11 @@ if (oldImgCount > 0) {
     const img = CAT_IMG[svc.cat] || CAT_IMG["internal-trips"]
     run("UPDATE service_images SET url=? WHERE service_id=?", img, svc.id)
   }
-  // Fix banners too
   run("UPDATE banners SET image='https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200&q=80' WHERE image LIKE '/img/redsea%'")
   run("UPDATE banners SET image='https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=1200&q=80' WHERE image LIKE '/img/karnak%'")
   run("UPDATE banners SET image='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1200&q=80' WHERE image LIKE '/img/desert%'")
   console.log("[migration] Fixed", oldImgCount, "service image(s) to Unsplash URLs")
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 if (get("SELECT COUNT(*) c FROM users").c === 0) {
   console.log("empty database — seeding demo data...")
@@ -160,10 +158,6 @@ const MIME = {
   ".ico": "image/x-icon",
 }
 
-const RENDERER_FILES = [
-  "service-detail-transport.js",
-]
-
 async function serveStatic(res, pathname) {
   try {
     const rel = pathname === "/" ? "/app.html" : pathname
@@ -175,12 +169,17 @@ async function serveStatic(res, pathname) {
 
     if (ext === ".html") {
       let html = (await readFile(fp)).toString("utf8")
+
+      // Detect v2 app (has inline openDetail + URL routing) — skip old script injections
+      const isV2 = html.includes("<!-- RAGO-V2 -->")
+
       if (!html.includes('id="rago-chrome"')) {
         const styleTag = '\n<style id="rago-chrome">' + CHROME_CSS + "</style>\n"
         if (html.includes("</head>")) html = html.replace("</head>", styleTag + "</head>")
         else if (html.includes("</body>")) html = html.replace("</body>", styleTag + "</body>")
         else html = styleTag + html
       }
+      // Dashboard scripts work in both v1 and v2
       if (!html.includes("dashboard-pro.js?b=")) {
         const tag = '\n<script src="dashboard-pro.js?b=' + BUILD_ID + '"></script>\n'
         if (html.includes("</body>")) html = html.replace("</body>", tag + "</body>")
@@ -199,47 +198,47 @@ async function serveStatic(res, pathname) {
         else if (html.includes("</html>")) html = html.replace("</html>", dpx + "</html>")
         else html = html + dpx
       }
-      if (!html.includes("service-detail-data.js?b=")) {
-        const sdd = '\n<script src="service-detail-data.js?b=' + BUILD_ID + '"></script>\n'
-        if (html.includes("</body>")) html = html.replace("</body>", sdd + "</body>")
-        else if (html.includes("</html>")) html = html.replace("</html>", sdd + "</html>")
-        else html = html + sdd
-      }
-      for (let i = 1; i <= 5; i++) {
-        const scMark = "service-content-" + i + ".js?b="
-        if (!html.includes(scMark)) {
-          const sc = '\n<script src="service-content-' + i + '.js?b=' + BUILD_ID + '"></script>\n'
-          if (html.includes("</body>")) html = html.replace("</body>", sc + "</body>")
-          else if (html.includes("</html>")) html = html.replace("</html>", sc + "</html>")
-          else html = html + sc
+      // v1-only scripts: skip for v2 (they override inline functions)
+      if (!isV2) {
+        if (!html.includes("service-detail-data.js?b=")) {
+          const sdd = '\n<script src="service-detail-data.js?b=' + BUILD_ID + '"></script>\n'
+          if (html.includes("</body>")) html = html.replace("</body>", sdd + "</body>")
+          else if (html.includes("</html>")) html = html.replace("</html>", sdd + "</html>")
+          else html = html + sdd
         }
-      }
-      for (const rf of RENDERER_FILES) {
-        const rfMark = rf + "?b="
-        if (!html.includes(rfMark)) {
-          const rft = '\n<script src="' + rf + '?b=' + BUILD_ID + '"></script>\n'
+        for (let i = 1; i <= 5; i++) {
+          const scMark = "service-content-" + i + ".js?b="
+          if (!html.includes(scMark)) {
+            const sc = '\n<script src="service-content-' + i + '.js?b=' + BUILD_ID + '"></script>\n'
+            if (html.includes("</body>")) html = html.replace("</body>", sc + "</body>")
+            else if (html.includes("</html>")) html = html.replace("</html>", sc + "</html>")
+            else html = html + sc
+          }
+        }
+        if (!html.includes("service-detail-transport.js?b=")) {
+          const rft = '\n<script src="service-detail-transport.js?b=' + BUILD_ID + '"></script>\n'
           if (html.includes("</body>")) html = html.replace("</body>", rft + "</body>")
           else if (html.includes("</html>")) html = html.replace("</html>", rft + "</html>")
           else html = html + rft
         }
-      }
-      if (!html.includes("service-detail-pro.js?b=")) {
-        const sdp = '\n<script src="service-detail-pro.js?b=' + BUILD_ID + '"></script>\n'
-        if (html.includes("</body>")) html = html.replace("</body>", sdp + "</body>")
-        else if (html.includes("</html>")) html = html.replace("</html>", sdp + "</html>")
-        else html = html + sdp
-      }
-      if (!html.includes("home-pro.js?b=")) {
-        const hp = '\n<script src="home-pro.js?b=' + BUILD_ID + '"></script>\n'
-        if (html.includes("</body>")) html = html.replace("</body>", hp + "</body>")
-        else if (html.includes("</html>")) html = html.replace("</html>", hp + "</html>")
-        else html = html + hp
-      }
-      if (!html.includes("fix-opendetail.js?b=")) {
-        const fix = '\n<script src="fix-opendetail.js?b=' + BUILD_ID + '"></script>\n'
-        if (html.includes("</body>")) html = html.replace("</body>", fix + "</body>")
-        else if (html.includes("</html>")) html = html.replace("</html>", fix + "</html>")
-        else html = html + fix
+        if (!html.includes("service-detail-pro.js?b=")) {
+          const sdp = '\n<script src="service-detail-pro.js?b=' + BUILD_ID + '"></script>\n'
+          if (html.includes("</body>")) html = html.replace("</body>", sdp + "</body>")
+          else if (html.includes("</html>")) html = html.replace("</html>", sdp + "</html>")
+          else html = html + sdp
+        }
+        if (!html.includes("home-pro.js?b=")) {
+          const hp = '\n<script src="home-pro.js?b=' + BUILD_ID + '"></script>\n'
+          if (html.includes("</body>")) html = html.replace("</body>", hp + "</body>")
+          else if (html.includes("</html>")) html = html.replace("</html>", hp + "</html>")
+          else html = html + hp
+        }
+        if (!html.includes("fix-opendetail.js?b=")) {
+          const fix = '\n<script src="fix-opendetail.js?b=' + BUILD_ID + '"></script>\n'
+          if (html.includes("</body>")) html = html.replace("</body>", fix + "</body>")
+          else if (html.includes("</html>")) html = html.replace("</html>", fix + "</html>")
+          else html = html + fix
+        }
       }
       if (!html.includes('id="rago-nofill"')) {
         const nf = '\n<script id="rago-nofill">' + NOFILL_JS + "</script>\n"
@@ -309,8 +308,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (await serveStatic(res, pathname)) return
-    if (pathname === "/")
-      return sendJSON(res, 200, { name: "Masr Guide API", status: "ok", docs: "/api" })
+    // SPA fallback: serve app.html for ?s= routes
+    if (pathname === "/" || !pathname.includes("."))
+      if (await serveStatic(res, "/app.html")) return
     return sendJSON(res, 404, { error: "not found" })
   } catch (e) {
     if (e instanceof HttpError)
