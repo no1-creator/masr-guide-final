@@ -133,17 +133,39 @@ const MIME = {
   ".ico":  "image/x-icon",
 }
 
-async function serveStatic(res, pathname) {
+// Files that are rebuilt/redeployed frequently must always be revalidated so
+// users never see a stale cached version after a deploy. Images are stable
+// content so we allow long caching for performance.
+const ALWAYS_FRESH = new Set([".html", ".js", ".css", ".json", ".svg"])
+
+async function serveStatic(res, pathname, req) {
   try {
     const rel = pathname === "/" ? "/app.html" : pathname
     const fp = join(PUBLIC_DIR, rel)
     if (!fp.startsWith(PUBLIC_DIR)) return false
     const st = await stat(fp)
     if (!st.isFile()) return false
+    const ext = extname(fp)
+    const fresh = ALWAYS_FRESH.has(ext)
+    const lastModified = st.mtime.toUTCString()
+
+    // Fast path: if the browser already has the current version, return 304.
+    if (fresh && req && req.headers["if-modified-since"] === lastModified) {
+      res.writeHead(304, {
+        "Cache-Control": "no-cache, must-revalidate",
+        "Last-Modified": lastModified,
+      })
+      res.end()
+      return true
+    }
+
     const buf = await readFile(fp)
     res.writeHead(200, {
-      "Content-Type": MIME[extname(fp)] || "application/octet-stream",
-      "Cache-Control": extname(fp) === ".html" ? "no-store, must-revalidate" : "public, max-age=86400",
+      "Content-Type": MIME[ext] || "application/octet-stream",
+      "Last-Modified": lastModified,
+      "Cache-Control": fresh
+        ? "no-cache, must-revalidate"
+        : "public, max-age=604800",
     })
     res.end(buf)
     return true
@@ -192,9 +214,9 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, data)
     }
 
-    if (await serveStatic(res, pathname)) return
+    if (await serveStatic(res, pathname, req)) return
     // Fallback: any non-API, non-file path serves the app shell.
-    if (await serveStatic(res, "/app.html")) return
+    if (await serveStatic(res, "/app.html", req)) return
     return sendJSON(res, 404, { error: "not found" })
   } catch (e) {
     if (e instanceof HttpError)
