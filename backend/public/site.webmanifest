@@ -1,0 +1,12 @@
+{
+  "name": "RaGo \u2014 Tourism, Deals & Services in Egypt",
+  "short_name": "RaGo",
+  "description": "Book trips, tours, transfers, hotels, Nile cruises, diving and more across Egypt.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#123B4C",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
