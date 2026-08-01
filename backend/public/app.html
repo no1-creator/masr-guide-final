@@ -49,11 +49,11 @@ h2{font-size:22px;margin:0 0 4px}
 .snav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.85);border:none;font-size:18px;cursor:pointer}
 .snav.l{left:14px}.snav.r{right:14px}
 .catgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:16px 0 6px}
-.pcard{position:relative;height:120px;border-radius:16px;overflow:hidden;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.14);background-size:cover;background-position:center;transition:.15s}
-.pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(18,59,76,.18)}
-.pcard .ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(8,26,33,.85),rgba(8,26,33,.12) 62%,transparent)}
+.pcard{position:relative;height:120px;border-radius:16px;overflow:hidden;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.18);background-size:cover;background-position:center;transition:.2s}
+.pcard:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(18,59,76,.25)}
+.pcard .ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(8,26,33,.88),rgba(8,26,33,.15) 62%,transparent)}
 .pcard.on{outline:3px solid var(--orange);outline-offset:-3px}
-.pcard span{position:absolute;left:11px;right:10px;bottom:10px;color:#fff;font-size:13px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.6);line-height:1.15;z-index:1}
+.pcard span{position:absolute;left:11px;right:10px;bottom:10px;color:#fff;font-size:13px;font-weight:700;text-shadow:0 1px 6px rgba(0,0,0,.8);line-height:1.15;z-index:1}
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 18px}
 .filters input,.filters select{padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:14px}
 .filters input{flex:1;min-width:180px}
@@ -151,7 +151,6 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
 .linkbox input{flex:1;font-family:monospace;font-size:13px}
 @media(max-width:860px){.det-layout{grid-template-columns:1fr}.det-hero{height:280px}.det-hero-content h1{font-size:22px}.det-sidebar{position:static}.two{grid-template-columns:1fr}.dash{grid-template-columns:1fr}.highlights{grid-template-columns:1fr}}
 </style>
-<!-- Hide home content immediately if viewing a service detail URL -->
 <script>if(new URLSearchParams(location.search).get('s')){document.write('<style>#public-view{display:none!important}<\/style>');}</script>
 </head>
 <body>
@@ -176,7 +175,7 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
       <div class="catgrid" id="cats"></div>
       <div class="slider2" id="slider2"></div>
       <div class="filters">
-        <input id="q" placeholder="Search trips, cities..." oninput="debouncedLoad()">
+        <input id="q" placeholder="Search trips, cities..." oninput="debouncedLoad()" autocomplete="off">
         <select id="sort" onchange="loadServices()">
           <option value="">Recommended</option>
           <option value="price_asc">Price: low to high</option>
@@ -226,15 +225,15 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
     <button type="button" id="tab-phone" onclick="setAuthMethod('phone')" style="flex:1;border:none;padding:9px;font-weight:600;font-size:14px;cursor:pointer;background:var(--soft2);color:var(--text)">Phone</button>
   </div>
   <div id="auth-email">
-    <div class="field"><label>Email</label><input id="li-email" placeholder="you@email.com"></div>
-    <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;"></div>
-    <div id="reg-extra" class="hidden"><div class="field"><label>Name</label><input id="li-name"></div><div class="field"><label>Account type</label><select id="li-role"><option value="customer">Tourist</option><option value="vendor">Service provider</option></select></div></div>
+    <div class="field"><label>Email</label><input id="li-email" placeholder="you@email.com" autocomplete="email"></div>
+    <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;" autocomplete="current-password"></div>
+    <div id="reg-extra" class="hidden"><div class="field"><label>Name</label><input id="li-name" autocomplete="name"></div><div class="field"><label>Account type</label><select id="li-role"><option value="customer">Tourist</option><option value="vendor">Service provider</option></select></div></div>
     <div class="row" style="margin-top:6px"><button class="btn" id="li-submit" onclick="doAuth()">Log in</button><button class="btn ghost" onclick="closeModal('login-modal')">Cancel</button></div>
     <p class="muted" style="font-size:13px;margin-top:14px" id="li-switch"></p>
   </div>
   <div id="auth-phone" class="hidden">
-    <div class="field"><label>Mobile number</label><input id="ph-number" placeholder="+20 1XX XXX XXXX"></div>
-    <div id="ph-code-wrap" class="hidden"><div class="field"><label>Verification code</label><input id="ph-code" inputmode="numeric" placeholder="6-digit code"></div><div class="field"><label>Your name (optional)</label><input id="ph-name"></div></div>
+    <div class="field"><label>Mobile number</label><input id="ph-number" placeholder="+20 1XX XXX XXXX" autocomplete="off"></div>
+    <div id="ph-code-wrap" class="hidden"><div class="field"><label>Verification code</label><input id="ph-code" inputmode="numeric" placeholder="6-digit code" autocomplete="off"></div><div class="field"><label>Your name (optional)</label><input id="ph-name" autocomplete="off"></div></div>
     <div class="row" style="margin-top:6px"><button class="btn" id="ph-send" onclick="sendOtp()">Send code</button><button class="btn hidden" id="ph-verify" onclick="verifyOtp()">Verify &amp; sign in</button><button class="btn ghost" onclick="closeModal('login-modal')">Cancel</button></div>
     <p class="muted" style="font-size:13px;margin-top:10px" id="ph-hint"></p>
   </div>
@@ -263,9 +262,9 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
 <div class="overlay" id="svc-modal"><div class="modal">
   <h3 id="svc-title">New service</h3>
   <input type="hidden" id="sf-id">
-  <div class="field"><label>Title</label><input id="sf-title"></div>
-  <div class="row"><div class="field"><label>Category</label><select id="sf-cat"></select></div><div class="field"><label>Location</label><input id="sf-loc"></div></div>
-  <div class="row"><div class="field"><label>Price (USD)</label><input id="sf-price" type="number"></div><div class="field"><label>Duration</label><input id="sf-dur" placeholder="8h"></div></div>
+  <div class="field"><label>Title</label><input id="sf-title" autocomplete="off"></div>
+  <div class="row"><div class="field"><label>Category</label><select id="sf-cat"></select></div><div class="field"><label>Location</label><input id="sf-loc" autocomplete="off"></div></div>
+  <div class="row"><div class="field"><label>Price (USD)</label><input id="sf-price" type="number"></div><div class="field"><label>Duration</label><input id="sf-dur" placeholder="8h" autocomplete="off"></div></div>
   <div class="field"><label>Description</label><textarea id="sf-desc" rows="3"></textarea></div>
   <div class="field"><label>Images</label><input type="file" id="sf-file" accept="image/*" multiple onchange="sfUpload(event)"><div class="imgs" id="sf-imgs"></div></div>
   <label style="font-size:13px"><input type="checkbox" id="sf-feat"> Featured</label>
@@ -274,18 +273,18 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
 
 <div class="overlay" id="mkt-modal"><div class="modal">
   <h3>New marketer</h3>
-  <div class="field"><label>Name</label><input id="mk-name"></div>
-  <div class="field"><label>Email</label><input id="mk-email"></div>
-  <div class="row"><div class="field"><label>Password</label><input id="mk-pass" placeholder="changeme123"></div><div class="field"><label>Commission %</label><input id="mk-rate" type="number" value="5"></div></div>
-  <div class="field"><label>Referral code (optional)</label><input id="mk-code" placeholder="auto"></div>
+  <div class="field"><label>Name</label><input id="mk-name" autocomplete="off"></div>
+  <div class="field"><label>Email</label><input id="mk-email" autocomplete="off"></div>
+  <div class="row"><div class="field"><label>Password</label><input id="mk-pass" placeholder="changeme123" autocomplete="off"></div><div class="field"><label>Commission %</label><input id="mk-rate" type="number" value="5"></div></div>
+  <div class="field"><label>Referral code (optional)</label><input id="mk-code" placeholder="auto" autocomplete="off"></div>
   <div class="row" style="margin-top:6px"><button class="btn" onclick="saveMarketer()">Create</button><button class="btn ghost" onclick="closeModal('mkt-modal')">Cancel</button></div>
 </div></div>
 
 <div class="overlay" id="ban-modal"><div class="modal">
   <h3 id="ban-title">New banner</h3>
   <input type="hidden" id="bn-id">
-  <div class="field"><label>Title</label><input id="bn-title"></div>
-  <div class="field"><label>Image URL</label><input id="bn-image" placeholder="https://..."></div>
+  <div class="field"><label>Title</label><input id="bn-title" autocomplete="off"></div>
+  <div class="field"><label>Image URL</label><input id="bn-image" placeholder="https://..." autocomplete="off"></div>
   <div class="field"><label>Links to trip</label><select id="bn-svc"></select></div>
   <label style="font-size:13px"><input type="checkbox" id="bn-active" checked> Active</label>
   <div class="row" style="margin-top:14px"><button class="btn" onclick="saveBanner()">Save</button><button class="btn ghost" onclick="closeModal('ban-modal')">Cancel</button></div>
@@ -299,6 +298,30 @@ let TOKEN=localStorage.getItem('mg_token')||'';
 let USER=JSON.parse(localStorage.getItem('mg_user')||'null');
 let REF=localStorage.getItem('mg_ref')||'';
 let CATS=[],CUR_CAT='',CUR_SVC=null,SF_IMGS=[],LOGIN_MODE='login';
+
+// ===== صور الكاتيجوريز (Unsplash) =====
+const CAT_IMAGES={
+  airport:'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&q=80',
+  visa:'https://images.unsplash.com/photo-1521618755572-156ae0cdd74d?w=400&q=80',
+  transfers:'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=400&q=80',
+  hotels:'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=80',
+  'internal-trips':'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=400&q=80',
+  tours:'https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=400&q=80',
+  'nile-cruise':'https://images.unsplash.com/photo-1544967082-d9d25d867d66?w=400&q=80',
+  diving:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=80',
+  safari:'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400&q=80',
+  carrental:'https://images.unsplash.com/photo-1485291571150-772bcfc10da5?w=400&q=80',
+  guide:'https://images.unsplash.com/photo-1499678329028-101435549a4e?w=400&q=80',
+  sim:'https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=400&q=80',
+  dining:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80',
+  shopping:'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=400&q=80',
+  spa:'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80',
+  events:'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80',
+  insurance:'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400&q=80',
+  departure:'https://images.unsplash.com/photo-1507812984078-917a274065be?w=400&q=80',
+  pharmacy:'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=400&q=80'
+};
+// =============================================
 
 (()=>{const u=new URL(location.href);const r=u.searchParams.get('ref');if(r){REF=r;localStorage.setItem('mg_ref',r);api('/api/track/'+encodeURIComponent(r),{method:'POST'}).catch(()=>{});}})();
 
@@ -405,10 +428,48 @@ const CAT_INCLUDES={
   pharmacy:['Consultation','Wide medication range','Hotel delivery','Prescription help'],
 };
 
-async function loadCats(){try{CATS=await api('/api/categories');}catch{CATS=[];}const CATGRAD={visa:'#5A6B9E,#2E3A63',carrental:'#6B7B85,#123B4C',guide:'#C98A3B,#8A5A1E',sim:'#2E9E9B,#0E5C5A',dining:'#C46B4A,#7A3B2A',shopping:'#C46B9A,#7A3B63',events:'#7A5AC4,#3E2E7A',insurance:'#3E7CB1,#123B4C',departure:'#8A6BC4,#4A3B7A'};document.getElementById('cats').innerHTML=`<div class="pcard ${CUR_CAT===''?'on':''}" style="background:linear-gradient(135deg,#1C4E63,#0C2A36)" onclick="pickCat('')"><div class="ov"></div><span>All Services</span></div>`+CATS.map(c=>{const _st=`background:linear-gradient(135deg,${CATGRAD[c.key]||'#2E5E74,#123B4C'})`;return `<div class="pcard ${CUR_CAT===c.key?'on':''}" style="${_st}" onclick="pickCat('${c.key}')"><div class="ov"></div><span>${esc((c.labels&&c.labels.en)||c.key)}</span></div>`;}).join('');}
+// ===== صور الخدمات الافتراضية =====
+const SVC_FALLBACK_IMAGES={
+  airport:'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=600&q=80',
+  visa:'https://images.unsplash.com/photo-1521618755572-156ae0cdd74d?w=600&q=80',
+  transfers:'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=600&q=80',
+  hotels:'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80',
+  'internal-trips':'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=600&q=80',
+  tours:'https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=600&q=80',
+  'nile-cruise':'https://images.unsplash.com/photo-1544967082-d9d25d867d66?w=600&q=80',
+  diving:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80',
+  safari:'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=600&q=80',
+  carrental:'https://images.unsplash.com/photo-1485291571150-772bcfc10da5?w=600&q=80',
+  guide:'https://images.unsplash.com/photo-1499678329028-101435549a4e?w=600&q=80',
+  sim:'https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=600&q=80',
+  dining:'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
+  shopping:'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=600&q=80',
+  spa:'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600&q=80',
+  events:'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=600&q=80',
+  insurance:'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&q=80',
+  departure:'https://images.unsplash.com/photo-1507812984078-917a274065be?w=600&q=80',
+  pharmacy:'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=600&q=80'
+};
+function getSvcImg(s){
+  if(s.cover)return s.cover;
+  if(s.images&&s.images[0])return s.images[0];
+  const cat=(CATCACHE||[]).find(x=>x.id===s.category_id);
+  if(cat&&SVC_FALLBACK_IMAGES[cat.key])return SVC_FALLBACK_IMAGES[cat.key];
+  return 'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=600&q=80';
+}
+// =====================================
+
+async function loadCats(){try{CATS=await api('/api/categories');}catch{CATS=[];}
+  document.getElementById('cats').innerHTML=
+    `<div class="pcard ${CUR_CAT===''?'on':''}" style="background-image:url('https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=400&q=80')" onclick="pickCat('')"><div class="ov"></div><span>🌍 All Services</span></div>`+
+    CATS.map(c=>{
+      const img=CAT_IMAGES[c.key]||'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=400&q=80';
+      const label=(c.labels&&(c.labels.en||Object.values(c.labels)[0]))||c.key;
+      return `<div class="pcard ${CUR_CAT===c.key?'on':''}" style="background-image:url('${img}')" onclick="pickCat('${c.key}')"><div class="ov"></div><span>${esc(label)}</span></div>`;
+    }).join('');}
 function pickCat(k){CUR_CAT=k;loadCats();loadServices().then(function(){var g=document.getElementById('grid');if(g)setTimeout(function(){g.scrollIntoView({behavior:'smooth',block:'start'});},150);});}
 let dbT=null;function debouncedLoad(){clearTimeout(dbT);dbT=setTimeout(loadServices,300);}
-async function loadServices(){const q=document.getElementById('q').value,sort=document.getElementById('sort').value;const params=new URLSearchParams();if(CUR_CAT)params.set('cat',CUR_CAT);if(q)params.set('q',q);if(sort)params.set('sort',sort);let list=[];try{list=await api('/api/services?'+params.toString());}catch{list=[];}document.getElementById('grid').innerHTML=list.map(s=>`<div class="card" onclick="navToSvc(${s.id})"><div class="img" style="background-image:url('${s.cover||(s.images&&s.images[0])||''}')">${s.featured?`<span class="feat">&#11088; Featured</span>`:''}</div><div class="body"><div class="t">${esc(s.title)}</div><div class="loc">&#128205; ${esc(s.location)}</div><div class="meta"><span class="star">&#9733; ${s.rating} <span class="muted">(${s.reviews_count})</span></span><span class="price">${money(s.price)} <small>/ ${esc(s.duration||'')}</small></span></div></div></div>`).join('')||`<p class="muted">No services found.</p>`;}
+async function loadServices(){const q=document.getElementById('q').value,sort=document.getElementById('sort').value;const params=new URLSearchParams();if(CUR_CAT)params.set('cat',CUR_CAT);if(q)params.set('q',q);if(sort)params.set('sort',sort);let list=[];try{list=await api('/api/services?'+params.toString());}catch{list=[];}await ensureCats();document.getElementById('grid').innerHTML=list.map(s=>`<div class="card" onclick="navToSvc(${s.id})"><div class="img" style="background-image:url('${getSvcImg(s)}')">${s.featured?`<span class="feat">&#11088; Featured</span>`:''}</div><div class="body"><div class="t">${esc(s.title)}</div><div class="loc">&#128205; ${esc(s.location)}</div><div class="meta"><span class="star">&#9733; ${s.rating} <span class="muted">(${s.reviews_count})</span></span><span class="price">${money(s.price)} <small>/ ${esc(s.duration||'')}</small></span></div></div></div>`).join('')||`<p class="muted">No services found.</p>`;}
 
 async function _loadDetail(id){
   var pv=document.getElementById('public-view');
@@ -434,6 +495,7 @@ async function _loadDetail(id){
     const catLabel=_cat?((_cat.labels&&_cat.labels.en)||_cat.key):'';
     const isShop=!!_cat&&['shopping','pharmacy'].includes(_cat.key);
     const imgs=s.images&&s.images.length?s.images:[s.cover].filter(Boolean);
+    if(!imgs.length){const fb=SVC_FALLBACK_IMAGES[catKey]||'https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=1200&q=80';imgs.push(fb);}
     let reviews=[];try{reviews=await api('/api/reviews?service_id='+id);}catch{}
     const highlights=CAT_HIGHLIGHTS[catKey]||CAT_HIGHLIGHTS['internal-trips'];
     const includes=CAT_INCLUDES[catKey]||CAT_INCLUDES['internal-trips'];
@@ -486,13 +548,13 @@ const SEC={
   'admin:banners':async(m)=>{const b=await api('/api/banners?all=1');m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Ad banners</h3><button class="btn sm" onclick="openBanner()">+ New banner</button></div>`+tbl(['Title','Trip','Active','Action'],b.map(x=>[esc(x.title),x.service?esc(x.service.title):'—',x.active?'✅':'—',`<button class="btn sm ghost" onclick="openBanner(${x.id})">Edit</button> <button class="btn sm danger" onclick="delBanner(${x.id})">Delete</button>`]));},
   'admin:marketers':async(m)=>{const a=await api('/api/affiliates');m.innerHTML=`<h3 style="margin:0 0 12px">All marketers</h3>`+tbl(['Name','Code','Rate','Clicks'],a.map(x=>[esc(x.name),x.code,(x.commission_rate*100)+'%',x.clicks]));},
   'admin:payouts':async(m)=>{const p=await api('/api/payouts');m.innerHTML=`<h3 style="margin:0 0 12px">Payout requests</h3>`+tbl(['#','Owner','Amount','Status','Requested','Action'],p.map(x=>[x.id,`${esc(x.owner_type||'')} #${x.owner_id}`,money(x.amount),statusTag(x.status),String(x.requested_at||'').slice(0,10),payoutActions(x)]));},
-  'admin:settings':async(m)=>{const list=await api('/api/admin/settings');const cur={};list.forEach(s=>cur[s.key]=s.value);const known=[['site_name','Site name'],['platform_commission_rate','Platform commission (e.g. 0.10)'],['affiliate_default_rate','Default marketer rate (e.g. 0.05)'],['currency','Currency code'],['support_email','Support email'],['whatsapp','WhatsApp number']];const keys=[...new Set([...known.map(k=>k[0]),...Object.keys(cur)])];const labelOf=k=>{const f=known.find(x=>x[0]===k);return f?f[1]:k.replace(/_/g,' ');};m.innerHTML=card(`<h3 style="margin:0 0 12px">Platform settings</h3>`+keys.map(k=>`<div class="field"><label>${esc(labelOf(k))}</label><input id="set-${k}" value="${esc(cur[k]==null?'':cur[k])}"></div>`).join('')+`<button class="btn" style="margin-top:6px" onclick='saveSettings(${JSON.stringify(keys)})'>Save settings</button>`);},
+  'admin:settings':async(m)=>{const list=await api('/api/admin/settings');const cur={};list.forEach(s=>cur[s.key]=s.value);const known=[['site_name','Site name'],['platform_commission_rate','Platform commission (e.g. 0.10)'],['affiliate_default_rate','Default marketer rate (e.g. 0.05)'],['currency','Currency code'],['support_email','Support email'],['whatsapp','WhatsApp number']];const keys=[...new Set([...known.map(k=>k[0]),...Object.keys(cur)])];const labelOf=k=>{const f=known.find(x=>x[0]===k);return f?f[1]:k.replace(/_/g,' ');};m.innerHTML=card(`<h3 style="margin:0 0 12px">Platform settings</h3>`+keys.map(k=>`<div class="field"><label>${esc(labelOf(k))}</label><input id="set-${k}" value="${esc(cur[k]==null?'':cur[k])}" autocomplete="off"></div>`).join('')+`<button class="btn" style="margin-top:6px" onclick='saveSettings(${JSON.stringify(keys)})'>Save settings</button>`);},
   'vendor:overview':async(m)=>{const b=await api('/api/bookings');const w=await api('/api/wallets/me').catch(()=>({balance:0}));const rev=b.reduce((s,x)=>s+x.amount,0);m.innerHTML=`<div class="stats"><div class="stat"><div class="n">${b.length}</div><div class="l">Bookings</div></div><div class="stat"><div class="n">${money(rev)}</div><div class="l">Gross sales</div></div><div class="stat"><div class="n">${money(w.balance)}</div><div class="l">Wallet balance</div></div></div><h3 style="margin:6px 0 8px">Recent bookings</h3>`+bookingsTable(b.slice(0,8));},
   'vendor:services':async(m)=>{await ensureCats();const all=await api('/api/services');const me=await api('/api/vendors/me').catch(()=>null);const mine=me?all.filter(s=>s.vendor_id===me.id):all;m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">My services</h3><button class="btn sm" onclick="openService()">+ New service</button></div>`+tbl(['Title','Category','Price','Images','Action'],mine.map(s=>[esc(s.title),catName(s.category_id),money(s.price),(s.images?s.images.length:0),`<button class="btn sm ghost" onclick="openService(${s.id})">Edit</button> <button class="btn sm danger" onclick="delService(${s.id})">Delete</button>`]));},
   'vendor:marketers':async(m)=>{const a=await api('/api/affiliates');m.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">My marketers</h3><button class="btn sm" onclick="openModal('mkt-modal')">+ New marketer</button></div>`+tbl(['Name','Code','Rate','Clicks','Action'],a.map(x=>[esc(x.name),x.code,(x.commission_rate*100)+'%',x.clicks,`<button class="btn sm danger" onclick="delAff(${x.id})">Remove</button>`]));},
   'vendor:bookings':async(m)=>{const b=await api('/api/bookings');m.innerHTML=`<h3 style="margin:0 0 12px">Bookings</h3>`+bookingsTable(b,true);},
   'vendor:wallet':async(m)=>{await walletView(m);},
-  'vendor:profile':async(m)=>{const v=await api('/api/vendors/me');m.innerHTML=card(`<h3 style="margin:0 0 12px">Business profile</h3><div class="field"><label>Name</label><input id="vp-name" value="${esc(v.name||'')}"></div><div class="field"><label>City</label><input id="vp-city" value="${esc(v.city||'')}"></div><div class="field"><label>Languages</label><input id="vp-langs" value="${esc(v.languages||'')}"></div><div class="field"><label>Description</label><textarea id="vp-desc" rows="3">${esc(v.description||'')}</textarea></div><button class="btn" onclick="saveProfile()">Save profile</button>`);},
+  'vendor:profile':async(m)=>{const v=await api('/api/vendors/me');m.innerHTML=card(`<h3 style="margin:0 0 12px">Business profile</h3><div class="field"><label>Name</label><input id="vp-name" value="${esc(v.name||'')}" autocomplete="off"></div><div class="field"><label>City</label><input id="vp-city" value="${esc(v.city||'')}" autocomplete="off"></div><div class="field"><label>Languages</label><input id="vp-langs" value="${esc(v.languages||'')}" autocomplete="off"></div><div class="field"><label>Description</label><textarea id="vp-desc" rows="3">${esc(v.description||'')}</textarea></div><button class="btn" onclick="saveProfile()">Save profile</button>`);},
   'affiliate:overview':async(m)=>{const a=await api('/api/affiliates/me');const b=await api('/api/bookings');const w=await api('/api/wallets/me').catch(()=>({balance:0}));m.innerHTML=`<div class="stats"><div class="stat"><div class="n">${a.clicks}</div><div class="l">Clicks</div></div><div class="stat"><div class="n">${b.length}</div><div class="l">Bookings</div></div><div class="stat"><div class="n">${money(w.balance)}</div><div class="l">Earnings</div></div></div>`;},
   'affiliate:link':async(m)=>{const a=await api('/api/affiliates/me');const link=a.link;m.innerHTML=card(`<h3 style="margin:0 0 8px">Your referral link</h3><div class="linkbox"><input id="aff-link" value="${esc(link)}" readonly><button class="btn" onclick="copyLink()">Copy</button></div><div style="margin-top:14px">${qrSvg(link)}</div><p class="muted" style="margin-top:10px">Share this link or QR. Any booking made through it earns you ${(a.commission_rate*100)}% commission.</p>`);},
   'affiliate:bookings':async(m)=>{const b=await api('/api/bookings');m.innerHTML=`<h3 style="margin:0 0 12px">Bookings</h3>`+bookingsTable(b);},
