@@ -172,17 +172,13 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
 
 <div class="overlay" id="login-modal"><div class="modal">
   <h3 id="login-title">Log in</h3>
-
-  <!-- Method tabs: Email / Phone -->
   <div class="row" style="gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden">
     <button type="button" id="tab-email" onclick="setAuthMethod('email')" style="flex:1;border:none;padding:9px;font-weight:600;font-size:14px;cursor:pointer;background:var(--blue);color:#fff">Email</button>
     <button type="button" id="tab-phone" onclick="setAuthMethod('phone')" style="flex:1;border:none;padding:9px;font-weight:600;font-size:14px;cursor:pointer;background:var(--soft2);color:var(--text)">Phone</button>
   </div>
-
-  <!-- EMAIL / PASSWORD -->
   <div id="auth-email">
     <div class="field"><label>Email</label><input id="li-email" placeholder="you@email.com"></div>
-    <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="••••••••"></div>
+    <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;"></div>
     <div id="reg-extra" class="hidden">
       <div class="field"><label>Name</label><input id="li-name"></div>
       <div class="field"><label>Account type</label><select id="li-role"><option value="customer">Tourist</option><option value="vendor">Service provider</option></select></div>
@@ -193,8 +189,6 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
     </div>
     <p class="muted" style="font-size:13px;margin-top:14px" id="li-switch"></p>
   </div>
-
-  <!-- PHONE / OTP -->
   <div id="auth-phone" class="hidden">
     <div class="field"><label>Mobile number</label><input id="ph-number" placeholder="+20 1XX XXX XXXX"></div>
     <div id="ph-code-wrap" class="hidden">
@@ -208,13 +202,9 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
     </div>
     <p class="muted" style="font-size:13px;margin-top:10px" id="ph-hint"></p>
   </div>
-
-  <!-- Divider -->
   <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--text2);font-size:13px">
     <div style="flex:1;height:1px;background:var(--border)"></div>or<div style="flex:1;height:1px;background:var(--border)"></div>
   </div>
-
-  <!-- SOCIAL -->
   <button class="btn ghost" style="width:100%;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="socialSoon('Google')">
     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C39.9 39.9 44 34.5 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
     Continue with Google
@@ -223,8 +213,7 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
     <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M16.365 1.43c0 1.14-.417 2.2-1.11 2.99-.75.85-1.98 1.51-3.02 1.43-.13-1.09.42-2.24 1.08-2.97.74-.83 2.03-1.44 3.05-1.45zM20.5 17.06c-.55 1.27-.81 1.83-1.52 2.95-.99 1.56-2.39 3.5-4.12 3.51-1.54.01-1.94-1-4.03-.99-2.09.01-2.53 1.01-4.07.99-1.73-.01-3.05-1.76-4.04-3.32C-.11 16.9-.5 11.42 1.66 8.51c1.03-1.43 2.66-2.34 4.16-2.34 1.53 0 2.49 1 3.75 1 1.22 0 1.96-1 3.73-1 1.34 0 2.76.73 3.77 2-3.31 1.81-2.77 6.54.68 8.89z"/></svg>
     Continue with Apple
   </button>
-
-  <p class="muted" style="font-size:12px;margin-top:14px">Demo: admin@masrguide.com / admin123 · vendor@rodina.com / vendor123 · ivan@aff.com / aff123 · tourist@example.com / tourist123</p>
+  <p class="muted" style="font-size:12px;margin-top:14px">Demo: admin@masrguide.com / admin123 &middot; vendor@rodina.com / vendor123 &middot; ivan@aff.com / aff123 &middot; tourist@example.com / tourist123</p>
 </div></div>
 
 <div class="overlay" id="book-modal"><div class="modal">
@@ -301,21 +290,20 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function closeModal(id){document.getElementById(id).classList.remove('on');}
 function openModal(id){document.getElementById(id).classList.add('on');}
 function money(n){return '$'+Number(n||0).toLocaleString();}
-  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function v(id){return document.getElementById(id).value;}
 
 let AUTH_METHOD='email', OTP_PHONE='';
 
 function renderAuth(){
   const chip=document.getElementById('user-chip'),lb=document.getElementById('login-btn'),db=document.getElementById('dash-btn');
-  if(USER){chip.innerHTML=`<span class="chip">${esc(USER.name||USER.email)} · ${USER.role}</span>`;lb.textContent='Log out';lb.onclick=logout;db.classList.toggle('hidden',USER.role==='customer');}
+  if(USER){chip.innerHTML=`<span class="chip">${esc(USER.name||USER.email)} &middot; ${USER.role}</span>`;lb.textContent='Log out';lb.onclick=logout;db.classList.toggle('hidden',USER.role==='customer');}
   else{chip.innerHTML='';lb.textContent='Log in';lb.onclick=openLogin;db.classList.add('hidden');}
 }
 
 function openLogin(){
   setLoginMode('login');
   setAuthMethod('email');
-  // reset phone state
   document.getElementById('ph-code-wrap').classList.add('hidden');
   document.getElementById('ph-verify').classList.add('hidden');
   document.getElementById('ph-send').classList.remove('hidden');
@@ -325,7 +313,6 @@ function openLogin(){
   openModal('login-modal');
 }
 
-// Switch between Email and Phone tabs
 function setAuthMethod(m){
   AUTH_METHOD=m;
   document.getElementById('auth-email').classList.toggle('hidden',m!=='email');
@@ -344,7 +331,6 @@ function syncLogin(){
   document.getElementById('li-switch').innerHTML=reg?`Have an account? <a href="#" onclick="setLoginMode('login');return false">Log in</a>`:`New here? <a href="#" onclick="setLoginMode('register');return false">Create account</a>`;
 }
 
-// Shared: store session + close modal + refresh UI
 function finishAuth(r){
   TOKEN=r.token;USER=r.user;
   localStorage.setItem('mg_token',TOKEN);localStorage.setItem('mg_user',JSON.stringify(USER));
@@ -362,7 +348,6 @@ async function doAuth(){
   }catch(e){toast(e.message);}
 }
 
-// Phone + OTP
 async function sendOtp(){
   const phone=document.getElementById('ph-number').value.trim();
   if(!phone){toast('Enter your mobile number');return;}
@@ -385,7 +370,6 @@ async function verifyOtp(){
   }catch(e){toast(e.message);}
 }
 
-// Social sign-in (buttons show until Google/Apple credentials are added)
 function socialSoon(p){toast(p+' sign-in will be enabled soon.');}
 
 function logout(){TOKEN='';USER=null;localStorage.removeItem('mg_token');localStorage.removeItem('mg_user');renderAuth();goHome();}
@@ -455,38 +439,63 @@ const NAVICON={overview:'grid',vendors:'store',services:'compass',banners:'image
 
 async function loadCats(){
   try{CATS=await api('/api/categories');}catch{CATS=[];}
-  const CATIMG={airport:1,transfers:1,hotels:1,'internal-trips':1,tours:1,'nile-cruise':1,diving:1,safari:1,pharmacy:1,spa:1};const CATGRAD={visa:'#5A6B9E,#2E3A63',carrental:'#6B7B85,#123B4C',guide:'#C98A3B,#8A5A1E',sim:'#2E9E9B,#0E5C5A',dining:'#C46B4A,#7A3B2A',shopping:'#C46B9A,#7A3B63',events:'#7A5AC4,#3E2E7A',insurance:'#3E7CB1,#123B4C',departure:'#8A6BC4,#4A3B7A'};document.getElementById('cats').innerHTML=`<div class="pcard ${CUR_CAT===''?'on':''}" style="background:linear-gradient(135deg,#1C4E63,#0C2A36)" onclick="pickCat('')"><div class="ov"></div><span>All Services</span></div>`+CATS.map(c=>{const _im=CATIMG[c.key];const _st=_im?`background-image:url('img/cat-${c.key}.jpg')`:`background:linear-gradient(135deg,${CATGRAD[c.key]||'#6B7B85,#123B4C'})`;return `<div class="pcard ${CUR_CAT===c.key?'on':''}" style="${_st}" onclick="pickCat('${c.key}')"><div class="ov"></div><span>${esc((c.labels&&c.labels.en)||c.key)}</span></div>`;}).join('');
+  const CATIMG={airport:1,transfers:1,hotels:1,'internal-trips':1,tours:1,'nile-cruise':1,diving:1,safari:1,pharmacy:1,spa:1};const CATGRAD={visa:'#5A6B9E,#2E3A63',carrental:'#6B7B85,#123B4C',guide:'#C98A3B,#8A5A1E',sim:'#2E9E9B,#0E5C5A',dining:'#C46B4A,#7A3B2A',shopping:'#C46B9A,#7A3B63',events:'#7A5AC4,#3E2E7A',insurance:'#3E7CB1,#123B4C',departure:'#8A6BC4,#4A3B7A'};
+  document.getElementById('cats').innerHTML=`<div class="pcard ${CUR_CAT===''?'on':''}" style="background:linear-gradient(135deg,#1C4E63,#0C2A36)" onclick="pickCat('')"><div class="ov"></div><span>All Services</span></div>`+CATS.map(c=>{const _im=CATIMG[c.key];const _st=_im?`background-image:url('img/cat-${c.key}.jpg')`:`background:linear-gradient(135deg,${CATGRAD[c.key]||'#6B7B85,#123B4C'})`;return `<div class="pcard ${CUR_CAT===c.key?'on':''}" style="${_st}" onclick="pickCat('${c.key}')"><div class="ov"></div><span>${esc((c.labels&&c.labels.en)||c.key)}</span></div>`;}).join('');
 }
-function pickCat(k){CUR_CAT=k;loadCats();loadServices();}
+
+// ★ KEY FIX: pickCat now scrolls to the service grid after loading
+function pickCat(k){
+  CUR_CAT=k;
+  loadCats();
+  loadServices().then(function(){
+    var g=document.getElementById('grid');
+    if(g) setTimeout(function(){g.scrollIntoView({behavior:'smooth',block:'start'});},150);
+  });
+}
+
 let dbT=null;function debouncedLoad(){clearTimeout(dbT);dbT=setTimeout(loadServices,300);}
+
 async function loadServices(){
   const q=document.getElementById('q').value,sort=document.getElementById('sort').value;
   const params=new URLSearchParams();if(CUR_CAT)params.set('cat',CUR_CAT);if(q)params.set('q',q);if(sort)params.set('sort',sort);
   let list=[];try{list=await api('/api/services?'+params.toString());}catch{list=[];}
   document.getElementById('grid').innerHTML=list.map(s=>`<div class="card" onclick="openDetail(${s.id})"><div class="img" style="background-image:url('${s.cover||(s.images&&s.images[0])||''}')">${s.featured?`<span class="feat">Featured</span>`:''}</div><div class="body"><div class="t">${esc(s.title)}</div><div class="loc">&#128205; ${esc(s.location)}</div><div class="meta"><span class="star">&#9733; ${s.rating} <span class="muted">(${s.reviews_count})</span></span><span class="price">${money(s.price)} <small>/ ${esc(s.duration||'')}</small></span></div></div></div>`).join('')||`<p class="muted">No trips found.</p>`;
 }
+
 async function openDetail(id){
-  await ensureCats();const s=await api('/api/services/'+id);CUR_SVC=s;const _cat=(CATCACHE||[]).find(x=>x.id===s.category_id);const isShop=!!_cat&&['shopping','pharmacy','bazaar','bazaars'].includes(_cat.key);
-  const imgs=s.images&&s.images.length?s.images:[s.cover].filter(Boolean);
-  let reviews=[];try{reviews=await api('/api/reviews?service_id='+id);}catch{}
-  document.getElementById('detail-body').innerHTML=`<div class="two"><div>
-    <div class="hero" id="d-hero" style="background-image:url('${imgs[0]||''}')"></div>
-    <div class="gallery">${imgs.map((u,i)=>`<div class="gth ${i===0?'on':''}" style="background-image:url('${u}')" onclick="heroPick(${i})"></div>`).join('')}</div>
-    <div class="eyebrow">${esc(s.vendor?s.vendor.name:'')}</div>
-    <h2>${esc(s.title)}</h2>
-    <p class="muted">&#128205; ${esc(s.location)} &middot; &#9201; ${esc(s.duration||'')} &middot; <span class="star">&#9733; ${s.rating}</span> (${s.reviews_count})</p>
-    <p>${esc(s.description)}</p>
-    ${isShop?'':`<h3>Availability</h3><p class="muted">${(s.availability||[]).slice(0,8).map(a=>a.date).join(' &middot; ')||'Contact provider'}</p>`}
-    <h3>Reviews (${reviews.length})</h3>${reviews.length?reviews.map(r=>`<div class="box" style="margin-bottom:8px"><span class="star">&#9733; ${r.rating}</span> ${esc(r.comment||'')}<div class="muted" style="font-size:13px">&mdash; ${esc(r.name||'Guest')}</div></div>`).join(''):`<p class="muted">No reviews yet.</p>`}
-  </div>
-  <div><div class="box">
-    <div class="price" style="font-size:26px;font-weight:800;color:var(--blue)">${money(s.price)}</div>
-    <div class="muted">${isShop?'Retail price':'per person'}</div>
-    <button class="btn" style="width:100%;margin-top:12px" onclick="openBooking()">${isShop?'Order / Reserve':'Book now'}</button>
-    ${REF?`<p class="muted" style="font-size:13px;margin-top:8px">Referral: ${esc(REF)}</p>`:''}
-  </div></div></div>`;
-  window.__imgs=imgs;show('detail-view');
+  // Show detail-view immediately with loading state for instant feedback
+  document.getElementById('detail-body').innerHTML='<div style="padding:80px 20px;text-align:center"><div style="font-size:38px;margin-bottom:14px">&#9992;</div><div style="font-size:16px;font-weight:700;color:var(--blue)">Loading...</div></div>';
+  show('detail-view');
+  try{
+    await ensureCats();
+    const s=await api('/api/services/'+id);
+    CUR_SVC=s;
+    const _cat=(CATCACHE||[]).find(x=>x.id===s.category_id);
+    const isShop=!!_cat&&['shopping','pharmacy','bazaar','bazaars'].includes(_cat.key);
+    const imgs=s.images&&s.images.length?s.images:[s.cover].filter(Boolean);
+    let reviews=[];try{reviews=await api('/api/reviews?service_id='+id);}catch{}
+    document.getElementById('detail-body').innerHTML=`<div class="two"><div>
+      <div class="hero" id="d-hero" style="background-image:url('${imgs[0]||''}')"></div>
+      <div class="gallery">${imgs.map((u,i)=>`<div class="gth ${i===0?'on':''}" style="background-image:url('${u}')" onclick="heroPick(${i})"></div>`).join('')}</div>
+      <div class="eyebrow">${esc(s.vendor?s.vendor.name:'')}</div>
+      <h2>${esc(s.title)}</h2>
+      <p class="muted">&#128205; ${esc(s.location)} &middot; &#9201; ${esc(s.duration||'')} &middot; <span class="star">&#9733; ${s.rating}</span> (${s.reviews_count} reviews)</p>
+      <p>${esc(s.description)}</p>
+      ${isShop?'':`<h3>Availability</h3><p class="muted">${(s.availability||[]).slice(0,8).map(a=>a.date).join(' &middot; ')||'Contact provider'}</p>`}
+      <h3>Reviews (${reviews.length})</h3>${reviews.length?reviews.map(r=>`<div class="box" style="margin-bottom:8px"><span class="star">&#9733; ${r.rating}</span> ${esc(r.comment||'')}<div class="muted" style="font-size:13px">&mdash; ${esc(r.name||'Guest')}</div></div>`).join(''):`<p class="muted">No reviews yet.</p>`}
+    </div>
+    <div><div class="box">
+      <div class="price" style="font-size:26px;font-weight:800;color:var(--blue)">${money(s.price)}</div>
+      <div class="muted">${isShop?'Retail price':'per person'}</div>
+      <button class="btn" style="width:100%;margin-top:12px" onclick="openBooking()">${isShop?'Order / Reserve':'Book now'}</button>
+      ${REF?`<p class="muted" style="font-size:13px;margin-top:8px">Referral: ${esc(REF)}</p>`:''}
+    </div></div></div>`;
+    window.__imgs=imgs;
+  }catch(e){
+    document.getElementById('detail-body').innerHTML=`<p class="muted">Could not load service details. <a href="#" onclick="goHome()">Go back</a></p>`;
+  }
 }
+
 function heroPick(i){document.getElementById('d-hero').style.backgroundImage="url('"+window.__imgs[i]+"')";document.querySelectorAll('#detail-view .gth').forEach((e,x)=>e.classList.toggle('on',x===i));}
 function openBooking(){if(!USER){toast('Please log in to book');openLogin();return;}document.getElementById('bk-ref').textContent=REF?('Referral code applied: '+REF):'';openModal('book-modal');}
 async function submitBooking(){
@@ -560,7 +569,7 @@ async function openService(id){await ensureCats();SF_IMGS=[];document.getElement
   if(id){const s=await api('/api/services/'+id);document.getElementById('svc-title').textContent='Edit service';document.getElementById('sf-id').value=s.id;document.getElementById('sf-title').value=s.title;document.getElementById('sf-loc').value=s.location||'';document.getElementById('sf-price').value=s.price;document.getElementById('sf-dur').value=s.duration||'';document.getElementById('sf-desc').value=s.description||'';document.getElementById('sf-feat').checked=!!s.featured;SF_IMGS=(s.images||[]).slice();const c=CATCACHE.find(x=>x.id===s.category_id);if(c)document.getElementById('sf-cat').value=c.key;}
   else{document.getElementById('svc-title').textContent='New service';['sf-id','sf-title','sf-loc','sf-price','sf-dur','sf-desc'].forEach(x=>document.getElementById(x).value='');document.getElementById('sf-feat').checked=false;}
   renderSfImgs();openModal('svc-modal');}
-function renderSfImgs(){document.getElementById('sf-imgs').innerHTML=SF_IMGS.map((u,i)=>`<div class="th" style="background-image:url('${u}')"><b onclick="SF_IMGS.splice(${i},1);renderSfImgs()">×</b></div>`).join('');}
+function renderSfImgs(){document.getElementById('sf-imgs').innerHTML=SF_IMGS.map((u,i)=>`<div class="th" style="background-image:url('${u}')"><b onclick="SF_IMGS.splice(${i},1);renderSfImgs()">x</b></div>`).join('');}
 function sfUpload(e){[...e.target.files].forEach(f=>{const r=new FileReader();r.onload=()=>{SF_IMGS.push(r.result);renderSfImgs();};r.readAsDataURL(f);});e.target.value='';}
 async function saveService(){const id=document.getElementById('sf-id').value;const body={title:v('sf-title'),category_key:v('sf-cat'),location:v('sf-loc'),price:Number(v('sf-price'))||0,duration:v('sf-dur'),description:v('sf-desc'),featured:document.getElementById('sf-feat').checked,images:SF_IMGS};
   try{if(id)await api('/api/services/'+id,{method:'PUT',body});else await api('/api/services',{method:'POST',body});closeModal('svc-modal');toast('Saved');loadSec();}catch(e){toast(e.message);}}
@@ -576,18 +585,13 @@ async function saveBanner(){const id=document.getElementById('bn-id').value;cons
 function copyLink(){const el=document.getElementById('aff-link');el.select();navigator.clipboard.writeText(el.value).then(()=>toast('Copied'));}
 function qrSvg(text){let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCodeAt(i))>>>0;const n=21,cell=8;let rects='';for(let y=0;y<n;y++)for(let x=0;x<n;x++){const fin=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);const on=fin?((x===0||x===6||y===0||y===6||(x>=2&&x<=4&&y>=2&&y<=4))):(((h>>((x*3+y*5)%31))&1)&&((x+y)%2===0||((h>>(x%13))&1)));if(on)rects+=`<rect x="${x*cell}" y="${y*cell}" width="${cell}" height="${cell}"/>`;}return `<svg class="qr" width="${n*cell}" height="${n*cell}" viewBox="0 0 ${n*cell} ${n*cell}" fill="#111">${rects}</svg>`;}
 
-  /* ===================== Group Trips — admin dashboard ===================== */
-/* Adds a "Group Trips" section to the Admin dashboard. Self-contained: it only
-   augments the existing NAV / NAVICON / SEC objects, so nothing else changes. */
+/* ===================== Group Trips — admin dashboard ===================== */
 (function(){
-  // 1) Add the menu item (before "Settings") + its icon.
   if(NAV.admin.indexOf('grouptrips')<0){
     var at=NAV.admin.indexOf('settings'); if(at<0) at=NAV.admin.length;
     NAV.admin.splice(at,0,'grouptrips');
   }
   NAVICON.grouptrips='users';
-
-  // 2) Show a friendly "Group Trips" label (renderNav auto-capitalises keys).
   var _renderNav=renderNav;
   renderNav=function(){
     _renderNav();
@@ -600,8 +604,6 @@ function qrSvg(text){let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCode
       }
     });
   };
-
-  // 3) The panel itself.
   SEC['admin:grouptrips']=async function(m){
     var d=await api('/api/admin/group-trips');
     var trips=d.trips||[];
@@ -626,7 +628,7 @@ function qrSvg(text){let h=0;for(let i=0;i<text.length;i++)h=(h*31+text.charCode
             t.id,
             esc(t.title||'—')+(t.admin_note==='__DEMO__'?' <span class="tag">demo</span>':''),
             statusTag(t.status),
-            (t.date_from||t.preferred_date||'—')+(t.date_to?(' → '+t.date_to):'')+(t.final_date?('<br><b>Final: '+t.final_date+'</b>'):''),
+            (t.date_from||t.preferred_date||'—')+(t.date_to?(' &rarr; '+t.date_to):'')+(t.final_date?('<br><b>Final: '+t.final_date+'</b>'):''),
             (t.members_count||0)+(t.min_people?(' / '+t.min_people):''),
             t.current_per_person!=null?money(t.current_per_person):'—',
             (t.price_small!=null?money(t.price_small):'—')+' / '+(t.price_group!=null?money(t.price_group):'—'),
@@ -651,13 +653,13 @@ async function gtNew(){
   try{await api('/api/group-trips/request',{method:'POST',body:{title:title,itinerary_text:itn||title,date_from:from,date_to:to}});toast('Trip created — now set a quote');loadSec();}catch(e){toast(e.message);}
 }
 async function gtQuote(id){
-  var ps=Number(prompt('Private-car (ملاكي) TOTAL price in $:')); if(!ps) return;
-  var pg=Number(prompt('Bus/group (باص) TOTAL price in $:')); if(!pg) return;
+  var ps=Number(prompt('Private-car TOTAL price in $:')); if(!ps) return;
+  var pg=Number(prompt('Bus/group TOTAL price in $:')); if(!pg) return;
   try{await api('/api/admin/group-trips/'+id+'/quote',{method:'POST',body:{price_small:ps,price_group:pg}});toast('Quoted');loadSec();}catch(e){toast(e.message);}
 }
 async function gtStatus(id){
   var st=prompt('New status: pending, quoted, open, voting, confirmed, completed, cancelled, expired'); if(!st) return;
-  try{await api('/api/admin/group-trips/'+id+'/status',{method:'POST',body:{status:st.trim()}});toast('Status → '+st.trim());loadSec();}catch(e){toast(e.message);}
+  try{await api('/api/admin/group-trips/'+id+'/status',{method:'POST',body:{status:st.trim()}});toast('Status updated');loadSec();}catch(e){toast(e.message);}
 }
 async function gtFinalize(id){
   var d=prompt('Final trip date (YYYY-MM-DD) — leave blank to auto-pick the top-voted day:'); if(d===null) return;
@@ -669,7 +671,7 @@ async function gtMembers(id){
   try{
     var r=await api('/api/admin/group-trips/'+id+'/members');var list=r.members||[];
     var m=document.getElementById('dmain');
-    m.innerHTML='<button class="btn ghost sm" onclick="navTo(\'grouptrips\')">← Back to trips</button>'
+    m.innerHTML='<button class="btn ghost sm" onclick="navTo(\'grouptrips\')">&#8592; Back to trips</button>'
       +'<h3 style="margin:14px 0">Members of trip #'+id+' ('+list.length+')</h3>'
       +tbl(['#','Name','Phone','Seats','Amount','Status','Voted day','Action'],
         list.map(function(x){
@@ -680,7 +682,7 @@ async function gtMembers(id){
 }
 async function gtPay(id){try{await api('/api/admin/group-members/'+id+'/pay',{method:'POST',body:{status:'paid'}});toast('Marked paid');if(GT_MTRIP)gtMembers(GT_MTRIP);}catch(e){toast(e.message);}}
 async function gtRefund(id){if(!confirm('Refund this member?'))return;try{await api('/api/admin/group-members/'+id+'/pay',{method:'POST',body:{status:'refunded'}});toast('Refunded');if(GT_MTRIP)gtMembers(GT_MTRIP);}catch(e){toast(e.message);}}
-async function gtSeedDemo(){if(!confirm('Add 10 demo group trips? (safe — you can remove them anytime)'))return;try{var r=await api('/api/admin/group-trips/seed-demo',{method:'POST'});toast('Added '+r.created+' demo trips');loadSec();}catch(e){toast(e.message);}}
+async function gtSeedDemo(){if(!confirm('Add 10 demo group trips?'))return;try{var r=await api('/api/admin/group-trips/seed-demo',{method:'POST'});toast('Added '+r.created+' demo trips');loadSec();}catch(e){toast(e.message);}}
 async function gtClearDemo(){if(!confirm('Remove ALL demo group trips?'))return;try{var r=await api('/api/admin/group-trips/clear-demo',{method:'POST'});toast('Removed '+r.removed+' demo trips');loadSec();}catch(e){toast(e.message);}}
 async function gtSettingsModal(){
   try{
@@ -694,10 +696,11 @@ async function gtSettingsModal(){
     toast('Group-trip settings saved');
   }catch(e){toast(e.message);}
 }
-/* =================== end Group Trips — admin dashboard =================== */
+/* =================== end Group Trips =================== */
+
 renderAuth();loadSlider();loadSlider2();loadCats();loadServices();
 </script>
 <script src="group-trips.js"></script>
 <script src="demo-trips.js"></script>
-  body>
+</body>
 </html>
