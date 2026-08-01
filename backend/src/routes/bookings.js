@@ -45,6 +45,7 @@ export const routes = [
 				referral_code: body.referral_code || null,
 				date: body.date || null,
 				pax: Number(body.pax) || 1,
+				details: body.details || null,
 			})
 		},
 	},
