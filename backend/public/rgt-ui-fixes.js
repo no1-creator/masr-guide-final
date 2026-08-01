@@ -91,3 +91,169 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan)
   else scan()
 })()
+
+/* RaGo - Detail page premium polish (additive, isolated).
+ * After the frozen category engine renders a service detail page, this adds:
+ *   1) a trust strip under the title,
+ *   2) a review rating breakdown (average + 5..1 star bars) in the Reviews section,
+ *   3) a mobile sticky "from $X - Book now" bar.
+ * It never edits the engine; it only observes #detail-body and augments the DOM. */
+(function () {
+  'use strict'
+
+  function money(n) { return '$' + (Math.round((Number(n) || 0) * 100) / 100) }
+
+  function injectStyle() {
+    if (document.getElementById('rgtd-style')) return
+    var css = [
+      '.rgtd-trust{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 2px}',
+      '.rgtd-trust span{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;padding:6px 12px;border-radius:999px}',
+      '.rgtd-trust .g{background:#E4F1EE;color:#2E8B7B}',
+      '.rgtd-trust .o{background:#FFF4E6;color:#8a5a1e}',
+      '.rgtd-trust .b{background:#E6EEF1;color:#123B4C}',
+      '.rgtd-break{display:flex;gap:22px;align-items:center;background:#f6fafb;border:1px solid #eef3f5;border-radius:15px;padding:18px;margin:0 0 16px;flex-wrap:wrap}',
+      '.rgtd-avg{text-align:center;flex:none}',
+      '.rgtd-avg b{display:block;font-size:38px;font-weight:800;color:#123B4C;line-height:1}',
+      '.rgtd-avg .st{color:#E8850F;display:inline-flex;gap:1px;margin:4px 0 2px}',
+      '.rgtd-avg small{display:block;color:#6b7b85;font-size:12.5px;font-weight:700}',
+      '.rgtd-bars{flex:1;min-width:210px;display:grid;gap:6px}',
+      '.rgtd-row{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#6b7b85;font-weight:700}',
+      '.rgtd-row .lb{width:30px;flex:none}',
+      '.rgtd-track{flex:1;height:8px;border-radius:999px;background:#e6eef1;overflow:hidden}',
+      '.rgtd-fill{display:block;height:100%;background:#E8850F;border-radius:999px}',
+      '.rgtd-row .pc{width:38px;text-align:right;flex:none}',
+      '.rgtd-bar{position:fixed;left:0;right:0;bottom:0;z-index:9990;display:none;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-top:1px solid #e6eef1;box-shadow:0 -6px 20px rgba(18,59,76,.12);padding:11px 16px}',
+      '.rgtd-bar .pr b{font-size:20px;font-weight:800;color:#123B4C}',
+      '.rgtd-bar .pr small{display:block;font-size:11.5px;color:#6b7b85;font-weight:700}',
+      '.rgtd-bar button{border:none;border-radius:12px;padding:13px 26px;background:#E8850F;color:#fff;font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;box-shadow:0 8px 18px rgba(232,133,15,.28)}',
+      '.rgtd-bar button:active{transform:translateY(1px)}',
+      '@media(max-width:900px){.rgtd-bar.on{display:flex}}'
+    ].join('')
+    var st = document.createElement('style')
+    st.id = 'rgtd-style'
+    st.textContent = css
+    ;(document.head || document.documentElement).appendChild(st)
+  }
+
+  function starSvg(on) {
+    return '<svg width="15" height="15" viewBox="0 0 24 24" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.4" style="vertical-align:middle"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6Z"/></svg>'
+  }
+  function starsHtml(r) {
+    var n = Math.round(Number(r) || 0), o = '', i
+    for (i = 1; i <= 5; i++) o += starSvg(i <= n)
+    return o
+  }
+
+  function addTrust(root) {
+    if (root.querySelector('.rgtd-trust')) return
+    var sub = root.querySelector('.eg-sub')
+    if (!sub) return
+    var html = '<div class="rgtd-trust">' +
+      '<span class="g">Instant confirmation</span>' +
+      '<span class="o">Free cancellation</span>' +
+      '<span class="b">Verified provider</span>' +
+      '<span class="b">Secure payment</span>' +
+      '</div>'
+    sub.insertAdjacentHTML('afterend', html)
+  }
+
+  function reviewsHeader(root) {
+    var hs = root.querySelectorAll('.eg-sec h3')
+    for (var i = 0; i < hs.length; i++) {
+      var t = (hs[i].textContent || '').replace(/^\s+/, '')
+      if (t.indexOf('Reviews') === 0) return hs[i]
+    }
+    return null
+  }
+
+  function addBreakdown(root) {
+    var h3 = reviewsHeader(root)
+    if (!h3) return
+    var sec = h3.parentNode
+    if (!sec || sec.getAttribute('data-rgtd-brk')) return
+    sec.setAttribute('data-rgtd-brk', '1')
+    var svc = window.CUR_SVC
+    if (!svc || !svc.id || typeof api !== 'function') { sec.removeAttribute('data-rgtd-brk'); return }
+    api('/api/reviews?service_id=' + svc.id).then(function (rv) {
+      rv = rv || []
+      if (!rv.length) return
+      var counts = [0, 0, 0, 0, 0], sum = 0, i
+      for (i = 0; i < rv.length; i++) {
+        var n = Math.round(Number(rv[i].rating) || 0)
+        if (n < 1) n = 1
+        if (n > 5) n = 5
+        counts[n - 1]++; sum += n
+      }
+      var total = rv.length
+      var avg = Math.round((sum / total) * 10) / 10
+      var bars = ''
+      for (var s = 5; s >= 1; s--) {
+        var pc = Math.round((counts[s - 1] / total) * 100)
+        bars += '<div class="rgtd-row"><span class="lb">' + s + '\u2605</span>' +
+          '<span class="rgtd-track"><span class="rgtd-fill" style="width:' + pc + '%"></span></span>' +
+          '<span class="pc">' + pc + '%</span></div>'
+      }
+      var html = '<div class="rgtd-break">' +
+        '<div class="rgtd-avg"><b>' + avg + '</b><span class="st">' + starsHtml(avg) + '</span>' +
+        '<small>' + total + ' verified review' + (total === 1 ? '' : 's') + '</small></div>' +
+        '<div class="rgtd-bars">' + bars + '</div></div>'
+      h3.insertAdjacentHTML('afterend', html)
+    }).catch(function () { sec.removeAttribute('data-rgtd-brk') })
+  }
+
+  function ensureBar() {
+    var bar = document.getElementById('rgtd-bar')
+    if (bar) return bar
+    bar = document.createElement('div')
+    bar.id = 'rgtd-bar'
+    bar.className = 'rgtd-bar'
+    bar.innerHTML = '<div class="pr"><b id="rgtd-bar-p"></b><small id="rgtd-bar-u"></small></div>' +
+      '<button type="button" id="rgtd-bar-b">Book now</button>'
+    document.body.appendChild(bar)
+    bar.querySelector('#rgtd-bar-b').addEventListener('click', function () {
+      var box = document.querySelector('#eg-cat .eg-book')
+      if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    return bar
+  }
+
+  function clearPad() { try { document.body.style.paddingBottom = '' } catch (e) {} }
+
+  function updateBar(root) {
+    var bar = ensureBar()
+    var svc = window.CUR_SVC
+    var box = root.querySelector('.eg-book')
+    if (!box || !svc) { bar.classList.remove('on'); clearPad(); return }
+    var p = document.getElementById('rgtd-bar-p')
+    var u = document.getElementById('rgtd-bar-u')
+    if (p) p.textContent = Number(svc.price) ? ('from ' + money(svc.price)) : 'Best price'
+    if (u) u.textContent = Number(svc.price) ? 'Reserve now, pay online' : 'On request'
+    bar.classList.add('on')
+    try { document.body.style.paddingBottom = (window.matchMedia && window.matchMedia('(max-width:900px)').matches) ? '84px' : '' } catch (e) {}
+  }
+
+  function enhance() {
+    var root = document.getElementById('eg-cat')
+    var bar = document.getElementById('rgtd-bar')
+    if (!root || !root.querySelector('.eg-book')) {
+      if (bar) bar.classList.remove('on')
+      clearPad()
+      return
+    }
+    injectStyle()
+    addTrust(root)
+    addBreakdown(root)
+    updateBar(root)
+  }
+
+  function start() {
+    var target = document.getElementById('detail-body') || document.body
+    try {
+      new MutationObserver(function () { enhance() }).observe(target, { childList: true, subtree: true })
+    } catch (e) {}
+    enhance()
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start)
+  else start()
+})()
