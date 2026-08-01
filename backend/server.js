@@ -2,7 +2,7 @@
 import http from "node:http"
 import { readFile, stat } from "node:fs/promises"
 import { extname, join } from "node:path"
-import { migrate, get, run } from "./src/db.js"
+import { migrate, get, all, run } from "./src/db.js"
 import { seed } from "./src/seed.js"
 import { verifyToken, bearer } from "./src/auth.js"
 import { sendJSON, preflight, readBody, parseQuery, HttpError } from "./src/util.js"
@@ -36,6 +36,46 @@ run(
 
 run("UPDATE services SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
 run("UPDATE bookings SET currency='USD' WHERE currency IS NULL OR currency='EGP'")
+
+// ─── Fix service images: replace old /img/*.png with real Unsplash photos ────
+const CAT_IMG = {
+  airport:        "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80",
+  visa:           "https://images.unsplash.com/photo-1618044733300-9472054094ee?w=800&q=80",
+  transfers:      "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&q=80",
+  hotels:         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
+  "internal-trips": "https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800&q=80",
+  tours:          "https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=800&q=80",
+  "nile-cruise":  "https://images.unsplash.com/photo-1568254183919-78a4f43a2877?w=800&q=80",
+  diving:         "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80",
+  safari:         "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80",
+  carrental:      "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=800&q=80",
+  guide:          "https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80",
+  sim:            "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=800&q=80",
+  dining:         "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+  shopping:       "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&q=80",
+  spa:            "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80",
+  events:         "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80",
+  insurance:      "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80",
+  departure:      "https://images.unsplash.com/photo-1529074963764-98f45c47344b?w=800&q=80",
+  pharmacy:       "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&q=80",
+}
+
+const oldImgCount = get("SELECT COUNT(*) c FROM service_images WHERE url LIKE '/img/%'").c
+if (oldImgCount > 0) {
+  const svcs = all(
+    "SELECT s.id, c.key cat FROM services s LEFT JOIN categories c ON c.id = s.category_id"
+  )
+  for (const svc of svcs) {
+    const img = CAT_IMG[svc.cat] || CAT_IMG["internal-trips"]
+    run("UPDATE service_images SET url=? WHERE service_id=?", img, svc.id)
+  }
+  // Fix banners too
+  run("UPDATE banners SET image='https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200&q=80' WHERE image LIKE '/img/redsea%'")
+  run("UPDATE banners SET image='https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=1200&q=80' WHERE image LIKE '/img/karnak%'")
+  run("UPDATE banners SET image='https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1200&q=80' WHERE image LIKE '/img/desert%'")
+  console.log("[migration] Fixed", oldImgCount, "service image(s) to Unsplash URLs")
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 if (get("SELECT COUNT(*) c FROM users").c === 0) {
   console.log("empty database — seeding demo data...")
