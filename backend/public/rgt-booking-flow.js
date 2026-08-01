@@ -9,22 +9,22 @@
 (function(){
   'use strict';
 
-  /* ---- professional sizing polish (injected last, so it wins) ---- */
+  /* ---- professional sizing polish (restrained & consistent, injected last) ---- */
   function injectFix(){
     if(document.getElementById('rgt-pro-fix'))return;
     var css=[
-      "#rago-cat .rgt-btn{padding:16px 22px;font-size:15.5px;font-weight:800;letter-spacing:.2px;border-radius:14px;box-shadow:0 10px 24px rgba(232,133,15,.30)}",
-      "#rago-cat .rgt-btn:hover{box-shadow:0 14px 30px rgba(232,133,15,.38)}",
-      "#rago-cat .rgt-hsb{padding:0 28px;font-size:15px;border-radius:14px;box-shadow:0 8px 18px rgba(232,133,15,.26)}",
-      "#rago-cat .rgt-chip{padding:10px 18px;font-size:13.5px}",
-      "#rago-cat .rgt-sort{padding:12px 16px}",
-      "#rago-cat .rgt-wc .ico{width:58px;height:58px;border-radius:17px}",
-      "#rago-cat .rgt-wc .ico .rgt-ic{width:27px;height:27px}",
-      "#rago-cat .rgt-hstats .rgt-ic{width:19px;height:19px}",
-      "#rago-cat .rgt-view .rgt-ic{width:16px;height:16px}",
-      "#rago-cat .rgt-btn .rgt-ic{width:18px;height:18px}",
-      "#rago-cat .rgt-badge2 .rgt-ic,#rago-cat .rgt-eye .rgt-ic{width:15px;height:15px}",
-      "#rago-cat .rgt-ic{stroke-width:1.85}"
+      "#rago-cat .rgt-btn{padding:14px 20px;font-size:15px;font-weight:800;letter-spacing:.2px;border-radius:13px;box-shadow:0 8px 20px rgba(232,133,15,.26)}",
+      "#rago-cat .rgt-btn:hover{box-shadow:0 12px 26px rgba(232,133,15,.32)}",
+      "#rago-cat .rgt-hsb{padding:0 24px;font-size:14.5px;border-radius:13px;box-shadow:0 8px 18px rgba(232,133,15,.24)}",
+      "#rago-cat .rgt-chip{padding:9px 16px;font-size:13px}",
+      "#rago-cat .rgt-sort{padding:11px 14px}",
+      "#rago-cat .rgt-wc .ico{width:52px;height:52px;border-radius:15px}",
+      "#rago-cat .rgt-wc .ico .rgt-ic{width:24px;height:24px}",
+      "#rago-cat .rgt-hstats .rgt-ic{width:17px;height:17px}",
+      "#rago-cat .rgt-view .rgt-ic{width:15px;height:15px}",
+      "#rago-cat .rgt-btn .rgt-ic{width:16px;height:16px}",
+      "#rago-cat .rgt-badge2 .rgt-ic,#rago-cat .rgt-eye .rgt-ic{width:14px;height:14px}",
+      "#rago-cat .rgt-ic{stroke-width:1.9}"
     ].join('');
     var st=document.createElement('style');st.id='rgt-pro-fix';st.textContent=css;
     (document.head||document.documentElement).appendChild(st);
