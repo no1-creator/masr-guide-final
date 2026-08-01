@@ -379,3 +379,114 @@
     toast('Link copied')
   }
 })()
+
+/* RaGo - Booking details viewer (additive, isolated).
+ * Adds an "Info" column to every bookings table (provider & admin) with a
+ * "View" button that opens the customer's submitted booking form and any
+ * uploaded documents. Wraps the shared bookingsTable; nothing else changes. */
+(function () {
+  'use strict'
+  if (typeof bookingsTable !== 'function' || typeof tbl !== 'function') return
+
+  var RGT_BK = {}
+
+  function injectStyle() {
+    if (document.getElementById('rgt-bk-style')) return
+    var css = [
+      '.rgt-kv{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #eef3f5;font-size:14px}',
+      '.rgt-kv:last-child{border-bottom:none}',
+      '.rgt-kv span{color:#6b7b85;font-weight:600}',
+      '.rgt-kv b{color:#123B4C;font-weight:700;text-align:right;word-break:break-word}',
+      '.rgt-files{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}',
+      '.rgt-file{display:flex;flex-direction:column;align-items:center;gap:6px;width:92px;text-decoration:none;color:#123B4C;font-size:11.5px;font-weight:700}',
+      '.rgt-fth{width:92px;height:70px;border-radius:12px;background:#e6eef1 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#123B4C;font-weight:800;border:1px solid #e4e7e9;font-size:12px}',
+      '.rgt-file span{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    ].join('')
+    var st = document.createElement('style')
+    st.id = 'rgt-bk-style'
+    st.textContent = css
+    ;(document.head || document.documentElement).appendChild(st)
+  }
+
+  window.bookingsTable = function (b, actions) {
+    try { (b || []).forEach(function (x) { RGT_BK[x.id] = x }) } catch (e) {}
+    var head = ['Ref', 'Trip', 'Date', 'Pax', 'Amount', 'Status', 'Info'].concat(actions ? ['Action'] : [])
+    var rows = (b || []).map(function (x) {
+      var row = [
+        '<code>' + esc(x.ref) + '</code>',
+        esc(x.service_title || ''),
+        x.date || '\u2014',
+        x.pax,
+        money(x.amount),
+        statusTag(x.status),
+        '<button class="btn sm ghost" onclick="rgtBkDetails(' + x.id + ')">View</button>'
+      ]
+      if (actions) row.push('<button class="btn sm" onclick="setBooking(' + x.id + ',\'confirmed\')">Confirm</button> <button class="btn sm ghost" onclick="setBooking(' + x.id + ',\'completed\')">Complete</button>')
+      return row
+    })
+    return tbl(head, rows)
+  }
+
+  function label(k) {
+    var w = String(k).split('_').join(' ').split('-').join(' ').split(' ')
+    for (var i = 0; i < w.length; i++) { if (w[i]) w[i] = w[i].charAt(0).toUpperCase() + w[i].slice(1) }
+    return w.join(' ')
+  }
+  function parseDetails(d) {
+    if (!d) return null
+    if (typeof d === 'object') return d
+    try { return JSON.parse(d) } catch (e) { return { Note: String(d) } }
+  }
+  function fileUrls(v) {
+    var out = []
+    function add(s) { if (typeof s === 'string' && s.indexOf('data:') === 0) out.push(s) }
+    if (typeof v === 'string') add(v)
+    else if (Array.isArray(v)) v.forEach(function (it) { if (typeof it === 'string') add(it); else if (it && typeof it === 'object') add(it.url || it.data || it.src || '') })
+    return out
+  }
+  function fileChip(name, u) {
+    var isImg = u.indexOf('data:image') === 0
+    var thumb = isImg ? ('<span class="rgt-fth" style="background-image:url(\'' + u + '\')"></span>') : '<span class="rgt-fth">FILE</span>'
+    return '<a class="rgt-file" href="' + u + '" target="_blank" rel="noopener">' + thumb + '<span>' + esc(name) + '</span></a>'
+  }
+
+  window.rgtBkDetails = function (id) {
+    var x = RGT_BK[id]
+    if (!x) { toast('No details available'); return }
+    injectStyle()
+    var d = parseDetails(x.details)
+    var info = ''
+    info += '<div class="rgt-kv"><span>Reference</span><b>' + esc(x.ref) + '</b></div>'
+    info += '<div class="rgt-kv"><span>Service</span><b>' + esc(x.service_title || '\u2014') + '</b></div>'
+    info += '<div class="rgt-kv"><span>Date</span><b>' + esc(x.date || '\u2014') + '</b></div>'
+    info += '<div class="rgt-kv"><span>Guests</span><b>' + esc(String(x.pax || '\u2014')) + '</b></div>'
+    info += '<div class="rgt-kv"><span>Amount</span><b>' + money(x.amount) + '</b></div>'
+    var files = ''
+    if (d && typeof d === 'object') {
+      Object.keys(d).forEach(function (k) {
+        var v = d[k]
+        var fl = fileUrls(v)
+        if (fl.length) { fl.forEach(function (u, i) { files += fileChip(label(k) + (fl.length > 1 ? (' ' + (i + 1)) : ''), u) }); return }
+        if (v == null || v === '' || (Array.isArray(v) && !v.length)) return
+        var txt = (typeof v === 'object') ? JSON.stringify(v) : String(v)
+        info += '<div class="rgt-kv"><span>' + esc(label(k)) + '</span><b>' + esc(txt) + '</b></div>'
+      })
+    }
+    var html = '<div class="modal" style="max-width:480px;width:100%;max-height:85vh;overflow:auto">'
+      + '<h3 style="margin:0 0 12px">Booking details</h3>'
+      + info
+      + (files ? ('<h3 style="margin:16px 0 4px;font-size:15px">Uploaded documents</h3><div class="rgt-files">' + files + '</div>') : '')
+      + '<button class="btn ghost" style="margin-top:16px;width:100%" onclick="document.getElementById(\'rgt-bk-ov\').classList.remove(\'on\')">Close</button>'
+      + '</div>'
+    var ov = document.getElementById('rgt-bk-ov')
+    if (!ov) {
+      ov = document.createElement('div')
+      ov.id = 'rgt-bk-ov'
+      ov.className = 'overlay'
+      ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('on') })
+      document.body.appendChild(ov)
+    }
+    ov.innerHTML = html
+    ov.classList.add('on')
+  }
+})()
