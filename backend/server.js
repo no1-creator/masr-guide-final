@@ -144,6 +144,9 @@ const MIME = {
   ".js":   "text/javascript",
   ".css":  "text/css",
   ".json": "application/json",
+  ".txt":  "text/plain; charset=utf-8",
+  ".xml":  "application/xml; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".png":  "image/png",
   ".jpg":  "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -154,7 +157,43 @@ const MIME = {
 // Files that are rebuilt/redeployed frequently must always be revalidated so
 // users never see a stale cached version after a deploy. Images are stable
 // content so we allow long caching for performance.
-const ALWAYS_FRESH = new Set([".html", ".js", ".css", ".json", ".svg"])
+const ALWAYS_FRESH = new Set([".html", ".js", ".css", ".json", ".svg", ".txt", ".xml", ".webmanifest"])
+
+// SEO / social meta injected into served HTML so search engines and link
+// unfurlers get rich tags without editing the app shell. Additive & idempotent.
+const SITE_URL = "https://api.trendy-girl.com"
+const SEO_HEAD = `
+<meta name="description" content="RaGo - book trips, tours, day trips, airport transfers, hotels, Nile cruises, diving, safari, guides, eSIM, dining and more across Egypt. Trusted local providers, instant confirmation and secure payment.">
+<meta name="keywords" content="Egypt tours, Egypt travel, Cairo day trips, Nile cruise, Red Sea diving, airport transfer Egypt, Egypt visa, Luxor Aswan tours, book Egypt trips, RaGo">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#123B4C">
+<meta name="author" content="RaGo">
+<link rel="canonical" href="${SITE_URL}/">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RaGo">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RaGo">
+<meta property="og:title" content="RaGo - Tourism, Deals & Services in Egypt">
+<meta property="og:description" content="Book trips, tours, transfers, hotels, Nile cruises, diving and more across Egypt. Trusted local providers, instant confirmation and secure payment.">
+<meta property="og:url" content="${SITE_URL}/">
+<meta property="og:image" content="${SITE_URL}/img/giza.png">
+<meta property="og:image:alt" content="RaGo - travel and services in Egypt">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RaGo - Tourism, Deals & Services in Egypt">
+<meta name="twitter:description" content="Book trips, tours, transfers, hotels, Nile cruises, diving and more across Egypt.">
+<meta name="twitter:image" content="${SITE_URL}/img/giza.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TravelAgency","name":"RaGo","url":"${SITE_URL}/","image":"${SITE_URL}/img/giza.png","description":"Book trips, tours, transfers, hotels, Nile cruises, diving, safari, guides and more across Egypt.","areaServed":{"@type":"Country","name":"Egypt"},"priceRange":"$$"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"RaGo","url":"${SITE_URL}/"}</script>
+`
+
+function injectSeo(html) {
+  if (html.includes('name="description"')) return html
+  const i = html.indexOf("</head>")
+  if (i === -1) return html
+  return html.slice(0, i) + SEO_HEAD + html.slice(i)
+}
 
 async function serveStatic(res, pathname, req) {
   try {
@@ -168,7 +207,8 @@ async function serveStatic(res, pathname, req) {
     const lastModified = st.mtime.toUTCString()
 
     // Fast path: if the browser already has the current version, return 304.
-    if (fresh && req && req.headers["if-modified-since"] === lastModified) {
+    // HTML is always re-served so injected SEO/meta stays current.
+    if (fresh && ext !== ".html" && req && req.headers["if-modified-since"] === lastModified) {
       res.writeHead(304, {
         "Cache-Control": "no-cache, must-revalidate",
         "Last-Modified": lastModified,
@@ -178,6 +218,7 @@ async function serveStatic(res, pathname, req) {
     }
 
     const buf = await readFile(fp)
+    const out = ext === ".html" ? Buffer.from(injectSeo(buf.toString("utf8")), "utf8") : buf
     res.writeHead(200, {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Last-Modified": lastModified,
@@ -185,7 +226,7 @@ async function serveStatic(res, pathname, req) {
         ? "no-cache, must-revalidate"
         : "public, max-age=604800",
     })
-    res.end(buf)
+    res.end(out)
     return true
   } catch {
     return false
