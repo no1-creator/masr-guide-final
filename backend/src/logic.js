@@ -13,6 +13,7 @@ export function createBooking({
 	referral_code = null,
 	date = null,
 	pax = 1,
+	details = null,
 }) {
 	const svc = get("SELECT * FROM services WHERE id=?", service_id)
 	if (!svc) throw new Error("service not found")
@@ -30,9 +31,20 @@ export function createBooking({
 		: 0
 	const vendor_share = round2(amount - platform_share - affiliate_share)
 
+	// details may be an object or a JSON string; store as a JSON string or null.
+	let detailsStr = null
+	if (details != null) {
+		try {
+			detailsStr =
+				typeof details === "string" ? details : JSON.stringify(details)
+		} catch (e) {
+			detailsStr = null
+		}
+	}
+
 	const ref = genRef()
 	const info = run(
-		"INSERT INTO bookings (ref,service_id,vendor_id,customer_id,affiliate_id,referral_code,date,pax,amount,currency,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO bookings (ref,service_id,vendor_id,customer_id,affiliate_id,referral_code,date,pax,details,amount,currency,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		ref,
 		service_id,
 		svc.vendor_id,
@@ -41,6 +53,7 @@ export function createBooking({
 		referral_code,
 		date,
 		Number(pax) || 1,
+		detailsStr,
 		amount,
 		svc.currency || "EGP",
 		"pending",
