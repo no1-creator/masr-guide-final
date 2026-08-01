@@ -151,6 +151,8 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
 .linkbox input{flex:1;font-family:monospace;font-size:13px}
 @media(max-width:860px){.det-layout{grid-template-columns:1fr}.det-hero{height:280px}.det-hero-content h1{font-size:22px}.det-sidebar{position:static}.two{grid-template-columns:1fr}.dash{grid-template-columns:1fr}.highlights{grid-template-columns:1fr}}
 </style>
+<!-- Hide home content immediately if viewing a service detail URL -->
+<script>if(new URLSearchParams(location.search).get('s')){document.write('<style>#public-view{display:none!important}<\/style>');}</script>
 </head>
 <body>
 <header><div class="container hdr">
@@ -332,21 +334,23 @@ async function verifyOtp(){const code=document.getElementById('ph-code').value.t
 function socialSoon(p){toast(p+' sign-in will be enabled soon.');}
 function logout(){TOKEN='';USER=null;localStorage.removeItem('mg_token');localStorage.removeItem('mg_user');renderAuth();goHome();}
 
-// ===== URL NAVIGATION =====
-function show(id){['public-view','detail-view','dash-view'].forEach(x=>{document.getElementById(x).classList.toggle('hidden',x!==id);});window.scrollTo(0,0);}
-function goHome(){
-  history.pushState(null,'',location.pathname);
-  show('public-view');
+// ===== NAVIGATION =====
+// Real page navigation: each service gets its own URL (?s=ID)
+// Back button works natively. No show/hide conflicts with injected scripts.
+function goHome(){window.location.href=location.pathname;}
+function navToSvc(id){window.location.href='?s='+id;}
+function openDetail(id){navToSvc(id);} // alias for compatibility
+function show(id){
+  // Only used for dashboard toggle (not for detail pages)
+  ['public-view','detail-view','dash-view'].forEach(function(x){
+    var el=document.getElementById(x);
+    if(!el)return;
+    if(x===id){el.style.cssText='display:block';el.classList.remove('hidden');}
+    else{el.style.cssText='display:none';el.classList.add('hidden');}
+  });
+  window.scrollTo(0,0);
 }
-function navToSvc(id){
-  history.pushState({svc:id},'','?s='+id);
-  _loadDetail(id);
-}
-window.addEventListener('popstate',function(e){
-  if(e.state&&e.state.svc){_loadDetail(e.state.svc);}
-  else{show('public-view');}
-});
-// ==========================
+// ======================
 
 let SLIDES=[],slideI=0,slideTimer=null;
 async function loadSlider(){try{SLIDES=await api('/api/banners');}catch{SLIDES=[];}const s=document.getElementById('slider');if(!SLIDES.length){s.style.display='none';return;}s.style.display='block';s.innerHTML=SLIDES.map((b,i)=>`<div class="slide ${i===0?'on':''}" style="background-image:url('${b.image||''}')" onclick="${b.service&&b.service.id?`navToSvc(${b.service.id})`:''}"><div class="cap"><h3>${esc(b.title)}</h3>${b.service?`<span class="chip">Book now &rarr;</span>`:''}</div></div>`).join('')+`<button class="snav l" onclick="slideBy(-1)">&lsaquo;</button><button class="snav r" onclick="slideBy(1)">&rsaquo;</button>`+`<div class="dots">${SLIDES.map((b,i)=>`<i class="${i===0?'on':''}" onclick="slideTo(${i})"></i>`).join('')}</div>`;slideI=0;clearInterval(slideTimer);slideTimer=setInterval(()=>slideBy(1),5000);}
@@ -410,6 +414,14 @@ let dbT=null;function debouncedLoad(){clearTimeout(dbT);dbT=setTimeout(loadServi
 async function loadServices(){const q=document.getElementById('q').value,sort=document.getElementById('sort').value;const params=new URLSearchParams();if(CUR_CAT)params.set('cat',CUR_CAT);if(q)params.set('q',q);if(sort)params.set('sort',sort);let list=[];try{list=await api('/api/services?'+params.toString());}catch{list=[];}document.getElementById('grid').innerHTML=list.map(s=>`<div class="card" onclick="navToSvc(${s.id})"><div class="img" style="background-image:url('${s.cover||(s.images&&s.images[0])||''}')">${s.featured?`<span class="feat">&#11088; Featured</span>`:''}</div><div class="body"><div class="t">${esc(s.title)}</div><div class="loc">&#128205; ${esc(s.location)}</div><div class="meta"><span class="star">&#9733; ${s.rating} <span class="muted">(${s.reviews_count})</span></span><span class="price">${money(s.price)} <small>/ ${esc(s.duration||'')}</small></span></div></div></div>`).join('')||`<p class="muted">No services found.</p>`;}
 
 async function _loadDetail(id){
+  // Show detail view, hide others
+  var pv=document.getElementById('public-view');
+  var dv=document.getElementById('detail-view');
+  var dsh=document.getElementById('dash-view');
+  if(pv){pv.style.cssText='display:none!important';pv.classList.add('hidden');}
+  if(dv){dv.style.cssText='display:block';dv.classList.remove('hidden');}
+  if(dsh){dsh.style.cssText='display:none!important';dsh.classList.add('hidden');}
+  window.scrollTo(0,0);
   document.getElementById('det-hero').style.backgroundImage="url('https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=1200&q=80')";
   document.getElementById('det-title').textContent='Loading...';
   document.getElementById('det-cat-label').textContent='';
@@ -417,7 +429,6 @@ async function _loadDetail(id){
   document.getElementById('det-gallery').innerHTML='';
   document.getElementById('det-main').innerHTML='<div style="padding:40px 0;text-align:center;color:#6B7B85"><div style="font-size:40px">&#9992;</div><p>Loading...</p></div>';
   document.getElementById('det-sidebar').innerHTML='';
-  show('detail-view');
   try{
     await ensureCats();
     const s=await api('/api/services/'+id);
@@ -452,11 +463,10 @@ async function _loadDetail(id){
       `<div class="book-widget"><div class="bw-header"><div class="bw-price">${money(s.price)}</div><div class="bw-price-sub">${isShop?'Retail price':'per person &nbsp;&bull;&nbsp; Instant confirmation'}</div></div><div class="bw-body"><div class="bw-field"><label>Select date</label><input type="date" id="bw-date" onchange="updateTotal()" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px"></div><div class="bw-field"><label>Guests</label><input type="number" id="bw-pax" value="1" min="1" max="20" onchange="updateTotal()" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px"></div><div id="bw-total" style="font-size:20px;font-weight:800;color:var(--blue);margin:10px 0 6px">${money(s.price)} total</div><button class="bw-cta" onclick="openBooking()">&#128197; Book now &rarr;</button><div class="bw-trust"><div class="trust-item">&#128274; Secure payment</div><div class="trust-item">&#9989; Free cancellation 24h</div><div class="trust-item">&#9889; Instant confirmation</div></div></div>`+(s.vendor?`<div class="vendor-card"><div class="vendor-avatar">${esc((s.vendor.name||'?')[0]).toUpperCase()}</div><div class="vendor-info"><div class="name">${esc(s.vendor.name)}</div><div class="badge">&#10003; Verified provider</div></div></div>`:'')+`</div>`;
     if(avail.length){const bwd=document.getElementById('bw-date');if(bwd){bwd.value=avail[0].date;updateTotal();}}
   }catch(e){
-    document.getElementById('det-main').innerHTML=`<p class="muted">Could not load details. <a href="#" onclick="goHome()">Go back</a></p>`;
-    console.error('openDetail error:',e);
+    document.getElementById('det-main').innerHTML=`<p class="muted">Could not load details. <a href="${location.pathname}">Go back</a></p>`;
+    console.error('_loadDetail error:',e);
   }
 }
-function openDetail(id){navToSvc(id);}
 function detGalleryPick(i){document.getElementById('det-hero').style.backgroundImage=`url('${window.__imgs[i]}')`;document.querySelectorAll('.det-gth').forEach((e,x)=>e.classList.toggle('on',x===i));}
 function pickDate(btn,date){document.querySelectorAll('.avail-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');const bwd=document.getElementById('bw-date');if(bwd){bwd.value=date;updateTotal();}}
 function updateTotal(){const pax=Number(document.getElementById('bw-pax')?.value||1);const total=(window.__curSvcPrice||0)*pax;const el=document.getElementById('bw-total');if(el)el.textContent=money(total)+' total';const bp=document.getElementById('bk-pax');if(bp)bp.value=pax;const d=document.getElementById('bw-date')?.value;if(d){const bd=document.getElementById('bk-date');if(bd)bd.value=d;}}
@@ -534,10 +544,16 @@ async function gtSeedDemo(){if(!confirm('Add 10 demo trips?'))return;try{var r=a
 async function gtClearDemo(){if(!confirm('Remove ALL demo trips?'))return;try{var r=await api('/api/admin/group-trips/clear-demo',{method:'POST'});toast('Removed '+r.removed+' demo trips');loadSec();}catch(e){toast(e.message);}}
 async function gtSettingsModal(){try{var s=await api('/api/group-trips/settings');var min=prompt('Min people:',s.min_people);if(min===null)return;var max=prompt('Max people:',s.max_people);if(max===null)return;var dl=prompt('Deadline days:',s.deadline_days);if(dl===null)return;var vh=prompt('Voting hours:',s.vote_hours);if(vh===null)return;var rh=prompt('Refund hours:',s.refund_hours);if(rh===null)return;await api('/api/admin/group-trips/settings',{method:'POST',body:{min_people:Number(min),max_people:Number(max),deadline_days:Number(dl),vote_hours:Number(vh),refund_hours:Number(rh)}});toast('Settings saved');}catch(e){toast(e.message);}}
 
-// Init
-renderAuth();loadSlider();loadSlider2();loadCats();loadServices();
-// Check URL for direct service link (?s=ID)
-(function(){var _s=new URLSearchParams(location.search).get('s');if(_s)_loadDetail(Number(_s));})();
+// ===== INIT =====
+renderAuth();
+var _INIT_SVC = new URLSearchParams(location.search).get('s');
+if(_INIT_SVC){
+  // Detail page mode: load categories then show detail
+  loadCats().then(function(){_loadDetail(Number(_INIT_SVC));});
+}else{
+  // Home page mode: load everything
+  loadSlider();loadSlider2();loadCats();loadServices();
+}
 </script>
 <script src="group-trips.js"></script>
 <script src="demo-trips.js"></script>
