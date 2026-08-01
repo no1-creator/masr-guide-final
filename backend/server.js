@@ -4,6 +4,7 @@ import { readFile, stat } from "node:fs/promises"
 import { extname, join } from "node:path"
 import { migrate, get, all, run } from "./src/db.js"
 import { seed } from "./src/seed.js"
+import { topupCatalog } from "./src/topup.js"
 import { verifyToken, bearer } from "./src/auth.js"
 import { sendJSON, preflight, readBody, parseQuery, HttpError } from "./src/util.js"
 
@@ -27,11 +28,11 @@ run(
   "pharmacy",
   JSON.stringify({
     en: "Pharmacy & Health",
-    fr: "Pharmacie & santé",
+    fr: "Pharmacie & sant\u00e9",
     de: "Apotheke & Gesundheit",
     it: "Farmacia & salute",
     es: "Farmacia y salud",
-    ru: "Аптека и здоровье",
+    ru: "\u0410\u043f\u0442\u0435\u043a\u0430 \u0438 \u0437\u0434\u043e\u0440\u043e\u0432\u044c\u0435",
   }),
 )
 
@@ -81,8 +82,16 @@ run("UPDATE bookings SET currency='USD' WHERE currency IS NULL OR currency='EGP'
 }
 
 if (get("SELECT COUNT(*) c FROM users").c === 0) {
-  console.log("empty database — seeding demo data...")
+  console.log("empty database \u2014 seeding demo data...")
   seed()
+}
+
+// Enrich thin/empty categories with more real services (idempotent, additive).
+// Never duplicates or deletes existing rows; safe to run on every boot.
+try {
+  topupCatalog()
+} catch (e) {
+  console.error("[topup] skipped:", (e && e.message) || e)
 }
 
 const ROUTES = [
