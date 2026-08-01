@@ -142,7 +142,7 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
       <div class="catgrid" id="cats"></div>
       <div class="slider2" id="slider2"></div>
       <div class="filters">
-        <input id="q" type="search" name="rago-search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search trips, cities..." oninput="debouncedLoad()">
+        <input id="q" type="search" name="rago-search-field" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" placeholder="Search trips, cities..." oninput="debouncedLoad()">
         <select id="sort" onchange="loadServices()">
           <option value="">Recommended</option>
           <option value="price_asc">Price: low to high</option>
@@ -290,5 +290,6 @@ code{background:var(--soft2);padding:2px 6px;border-radius:5px;font-size:13px}
 <script src="cat-configs-trips.js?v=1"></script>
 <script src="cat-configs-transport.js?v=1"></script>
 <script src="cat-configs-services.js?v=1"></script>
+<script>(function(){function g(){return document.getElementById('q');}function clr(){var q=g();if(q&&document.activeElement!==q&&/@/.test(q.value)){q.value='';}}var q=g();if(q){q.value='';setTimeout(clr,300);setTimeout(clr,900);setTimeout(clr,1800);}})();</script>
 </body>
 </html>
