@@ -1,12 +1,14 @@
 /* =====================================================================
- * RaGo - World-class dashboards (frontend-only, v4)
- * Premium, cohesive Overview screens for Admin / Provider / Marketer.
- * v4: modern line-icon set (Lucide-style) for KPI cards + hero actions,
- *     and a redesigned, cohesive sidebar menu (icons + active state).
+ * RaGo - World-class dashboards (frontend-only, v5)
+ * Premium, cohesive screens for Admin / Provider / Marketer.
+ * v5: uniform KPI card sizing (equal width via auto-fill + reserved
+ *     sparkline area for equal height), modern line-icons, redesigned
+ *     sidebar menu, AND premium provider sub-sections (services,
+ *     marketers, bookings, wallet, profile) matching the overview style.
  *
- * SAFE & ADDITIVE: wraps the global loadSec() and renderNav(); only the
- * Overview screen of admin/vendor/affiliate is taken over, and menu icons
- * are swapped after each render. Any error falls back silently.
+ * SAFE & ADDITIVE: wraps loadSec() and renderNav(); reuses existing global
+ * action functions (openService/delService/delAff/requestPayout/saveProfile
+ * /bookingsTable/openModal). Any error falls back to the original renderer.
  * ===================================================================== */
 (function () {
   'use strict';
@@ -56,8 +58,8 @@
     '.rgp-act.gold{background:#E8850F}',
     '.rgp-act.gold:hover{background:#cf7409}',
     '.rgp-act .ci{width:16px;height:16px}',
-    '.rgp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(216px,1fr));gap:14px;margin-bottom:18px}',
-    '.rgp-kpi{background:#fff;border:1px solid var(--border);border-radius:16px;padding:17px 17px 15px;position:relative;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease}',
+    '.rgp-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:14px;margin-bottom:18px}',
+    '.rgp-kpi{background:#fff;border:1px solid var(--border);border-radius:16px;padding:17px 17px 15px;position:relative;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s ease,box-shadow .15s ease}',
     '.rgp-kpi:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(18,59,76,.10)}',
     '.rgp-kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}',
     '.rgp-ki{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}',
@@ -73,7 +75,7 @@
     '.rgp-up{background:var(--green-soft);color:var(--green)}',
     '.rgp-down{background:#f7dedb;color:var(--red)}',
     '.rgp-new{background:var(--orange-soft);color:var(--orange)}',
-    '.rgp-spark{width:100%;height:40px;margin-top:13px;display:block}',
+    '.rgp-spark{width:100%;height:40px;margin-top:auto;padding-top:13px;display:block}',
     '.rgp-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}',
     '.rgp-panel{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px}',
     '.rgp-ph{margin-bottom:16px}',
@@ -101,7 +103,28 @@
     '#dnav button:hover{background:var(--soft2);color:var(--text)}',
     '#dnav button.on{background:var(--blue);color:#fff}',
     '#dnav button.on svg{opacity:1}',
-    '@media(max-width:760px){#dnav{flex-direction:row;flex-wrap:wrap}#dnav button{width:auto}}'
+    '@media(max-width:760px){#dnav{flex-direction:row;flex-wrap:wrap}#dnav button{width:auto}}',
+    '.rgp-shead{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}',
+    '.rgp-stitle{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.3px}',
+    '.rgp-ssub{font-size:13px;color:var(--text2);margin-top:3px}',
+    '.rgp-sacts{display:flex;gap:9px;flex-wrap:wrap}',
+    '.rgp-pbtn{border:none;border-radius:11px;padding:10px 16px;font-family:inherit;font-weight:700;font-size:13.5px;cursor:pointer;background:var(--blue);color:#fff;display:inline-flex;align-items:center;gap:7px;transition:.15s}',
+    '.rgp-pbtn:hover{background:var(--blue-h)}',
+    '.rgp-pbtn .ci{width:16px;height:16px}',
+    '.rgp-pbtn.gold{background:#E8850F}',
+    '.rgp-pbtn.gold:hover{background:#cf7409}',
+    '.rgp-pbtn.ghost{background:var(--soft2);color:var(--text)}',
+    '.rgp-pbtn.ghost:hover{background:var(--border)}',
+    '.rgp-kpis.mini{grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}',
+    '.rgp-kpis.mini .rgp-kv{font-size:22px}',
+    '.rgp-form{max-width:560px}',
+    '.rgp-wallet{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;background:linear-gradient(135deg,#123B4C,#0E2E3B);border-radius:16px;padding:22px 24px;margin-bottom:16px}',
+    '.rgp-wbal{color:#fff}',
+    '.rgp-wbal .l{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}',
+    '.rgp-wbal .v{font-size:32px;font-weight:800;letter-spacing:-.5px;margin-top:4px}',
+    '.rgp-wform{display:flex;gap:9px;flex-wrap:wrap}',
+    '.rgp-wform input{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;border-radius:11px;padding:10px 14px;font-family:inherit;font-size:14px;width:170px}',
+    '.rgp-wform input::placeholder{color:rgba(255,255,255,.6)}'
   ].join('');
 
   function injectStyles(){
@@ -117,6 +140,7 @@
   function esc2(s){ return (typeof window.esc==='function') ? window.esc(s) : String(s==null?'':s); }
   function tbl2(h,r){ return (typeof window.tbl==='function') ? window.tbl(h,r) : ''; }
   function bookingsTable2(b){ return (typeof window.bookingsTable==='function') ? window.bookingsTable(b) : ''; }
+  function bookingsTableA(b){ return (typeof window.bookingsTable==='function') ? window.bookingsTable(b, true) : ''; }
   function apiGet(p){ return window.api(p); }
   function safeArr(p){ return window.api(p).then(function(x){ return x||[]; }).catch(function(){ return []; }); }
   function safeObj(p,f){ return window.api(p).catch(function(){ return f||{}; }); }
@@ -137,8 +161,9 @@
     return '<span class="rgp-trend rgp-'+dir+'">'+arrow+' '+Math.abs(d)+'% <i>vs last mo.</i></span>';
   }
   function kpi(o){
+    var sp = o.spark ? o.spark : (o.nospark ? '' : '<div class="rgp-spark"></div>');
     return '<div class="rgp-kpi"><div class="rgp-kpi-top"><span class="rgp-ki '+(o.tone||'blue')+'">'+icon(o.icon)+'</span>'+(o.trend||'')+'</div>'
-      +'<div class="rgp-kv">'+o.value+'</div><div class="rgp-kl">'+o.label+'</div>'+(o.spark||'')+'</div>';
+      +'<div class="rgp-kv">'+o.value+'</div><div class="rgp-kl">'+o.label+'</div>'+sp+'</div>';
   }
   function spark(vals, tone){
     if(!vals||!vals.length) return '';
@@ -178,6 +203,10 @@
   function panel(title, sub, body){
     return '<div class="rgp-panel"><div class="rgp-ph"><div class="rgp-pt">'+title+'</div>'+(sub?'<div class="rgp-ps">'+sub+'</div>':'')+'</div>'+body+'</div>';
   }
+  function secWrap(title, sub, actions, body){
+    return '<div class="rgp"><div class="rgp-shead"><div><div class="rgp-stitle">'+title+'</div>'+(sub?'<div class="rgp-ssub">'+sub+'</div>':'')+'</div><div class="rgp-sacts">'+(actions||'')+'</div></div>'+body+'</div>';
+  }
+  function panelBox(body){ return '<div class="rgp-panel">'+body+'</div>'; }
   function hero(role){
     var names={admin:'Platform admin',vendor:'Your business',affiliate:'Your marketing'};
     var chip=document.getElementById('user-chip');
@@ -273,6 +302,55 @@
       +'</div>';
   }
 
+  async function renderVServices(m){
+    if(typeof window.ensureCats==='function'){ try{ await window.ensureCats(); }catch(e){} }
+    var res=await Promise.all([ safeArr('/api/services'), safeObj('/api/vendors/me',null) ]);
+    var all=res[0]||[], me=res[1];
+    var mine=(me&&me.id)?all.filter(function(s){ return s.vendor_id===me.id; }):all;
+    var cat=function(id){ return (typeof window.catName==='function')?window.catName(id):id; };
+    var rows=mine.map(function(s){ return [esc2(s.title), cat(s.category_id), money2(s.price), (s.images?s.images.length:0), '<button class="btn sm ghost" onclick="openService('+s.id+')">Edit</button> <button class="btn sm danger" onclick="delService('+s.id+')">Delete</button>']; });
+    var body = mine.length ? panelBox(tbl2(['Title','Category','Price','Images','Actions'],rows)) : panelBox('<p class="muted" style="margin:8px 0">No services yet — click “New service” to add your first one.</p>');
+    m.innerHTML=secWrap('My services','You have '+mine.length+' service'+(mine.length===1?'':'s')+' listed.','<button class="rgp-pbtn gold" onclick="openService()">'+icon('compass')+'New service</button>', body);
+  }
+  async function renderVMarketers(m){
+    var a=await safeArr('/api/affiliates');
+    var rows=a.map(function(x){ return [esc2(x.name), '<code>'+esc2(x.code)+'</code>', (num(x.commission_rate)*100)+'%', num(x.clicks), '<button class="btn sm danger" onclick="delAff('+x.id+')">Remove</button>']; });
+    var body = a.length ? panelBox(tbl2(['Name','Code','Rate','Clicks','Actions'],rows)) : panelBox('<p class="muted" style="margin:8px 0">No marketers yet — add one to grow sales through referrals.</p>');
+    m.innerHTML=secWrap('My marketers','Create referral accounts and track their clicks.','<button class="rgp-pbtn gold" onclick="openModal(&#39;mkt-modal&#39;)">'+icon('megaphone')+'New marketer</button>', body);
+  }
+  async function renderVBookings(m){
+    var bk=(await safeArr('/api/bookings')).slice().sort(function(a,c){ return num(c.id)-num(a.id); });
+    var pending=bk.filter(function(b){ return b.status==='pending'; }).length;
+    var confirmed=bk.filter(function(b){ return b.status==='confirmed'; }).length;
+    var completed=bk.filter(function(b){ return b.status==='completed'; }).length;
+    var stats='<div class="rgp-kpis mini">'
+      +kpi({icon:'ticket',tone:'blue',label:'Total',value:bk.length,nospark:true})
+      +kpi({icon:'store',tone:(pending>0?'red':'blue'),label:'Pending',value:pending,nospark:true})
+      +kpi({icon:'ticket',tone:'gold',label:'Confirmed',value:confirmed,nospark:true})
+      +kpi({icon:'star',tone:'green',label:'Completed',value:completed,nospark:true})
+      +'</div>';
+    var body = bk.length ? (stats+panelBox(bookingsTableA(bk))) : (stats+panelBox('<p class="muted" style="margin:8px 0">No bookings yet.</p>'));
+    m.innerHTML=secWrap('Bookings','Confirm, complete and review your bookings.','', body);
+  }
+  async function renderVWallet(m){
+    var w=await safeObj('/api/wallets/me',{balance:0,transactions:[]});
+    var tx=(w.transactions||[]).map(function(t){ return [String(t.created_at||'').slice(0,10), esc2(t.type), money2(t.amount), esc2(t.ref||'')]; });
+    var wallet='<div class="rgp-wallet"><div class="rgp-wbal"><div class="l">Available balance</div><div class="v">'+money2(w.balance)+'</div></div>'
+      +'<div class="rgp-wform"><input id="po-amt" type="number" placeholder="Amount to withdraw"><button class="rgp-pbtn gold" onclick="requestPayout()">'+icon('wallet')+'Request payout</button></div></div>';
+    var body = tx.length ? panelBox(tbl2(['Date','Type','Amount','Ref'],tx)) : panelBox('<p class="muted" style="margin:8px 0">No transactions yet.</p>');
+    m.innerHTML=secWrap('Wallet','Track your balance and request payouts.','', wallet+body);
+  }
+  async function renderVProfile(m){
+    var v=await safeObj('/api/vendors/me',{});
+    var form=panelBox('<div class="rgp-form">'
+      +'<div class="field"><label>Business name</label><input id="vp-name" value="'+esc2(v.name||'')+'"></div>'
+      +'<div class="field"><label>City</label><input id="vp-city" value="'+esc2(v.city||'')+'"></div>'
+      +'<div class="field"><label>Languages</label><input id="vp-langs" value="'+esc2(v.languages||'')+'"></div>'
+      +'<div class="field"><label>Description</label><textarea id="vp-desc" rows="3">'+esc2(v.description||'')+'</textarea></div>'
+      +'<button class="rgp-pbtn" onclick="saveProfile()">'+icon('user')+'Save profile</button></div>');
+    m.innerHTML=secWrap('Business profile','Keep your business details up to date.','', form);
+  }
+
   function currentRole(){
     var t=(document.getElementById('dash-title')||{}).textContent||'';
     if(/Admin/i.test(t)) return 'admin';
@@ -303,16 +381,20 @@
     var _orig=window.loadSec;
     window.loadSec=async function(){
       var role=currentRole(), sec=currentSection();
-      if(sec==='overview' && (role==='admin'||role==='vendor'||role==='affiliate')){
-        var m=document.getElementById('dmain');
-        if(m){
-          try{
-            m.innerHTML='<p class="muted">Loading...</p>';
-            if(role==='admin'){ await renderAdmin(m); return; }
-            if(role==='vendor'){ await renderVendor(m); return; }
-            await renderAffiliate(m); return;
-          }catch(e){}
-        }
+      var m=document.getElementById('dmain');
+      if(m){
+        try{
+          if(sec==='overview' && role==='admin'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderAdmin(m); return; }
+          if(sec==='overview' && role==='vendor'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderVendor(m); return; }
+          if(sec==='overview' && role==='affiliate'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderAffiliate(m); return; }
+          if(role==='vendor'){
+            if(sec==='services'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderVServices(m); return; }
+            if(sec==='marketers'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderVMarketers(m); return; }
+            if(sec==='bookings'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderVBookings(m); return; }
+            if(sec==='wallet'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderVWallet(m); return; }
+            if(sec==='profile'){ m.innerHTML='<p class="muted">Loading...</p>'; await renderVProfile(m); return; }
+          }
+        }catch(e){}
       }
       return _orig.apply(this, arguments);
     };
