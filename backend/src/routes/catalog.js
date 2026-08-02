@@ -10,7 +10,17 @@ function imagesFor(id) {
 function withImages(s) {
 	if (!s) return s
 	const images = imagesFor(s.id)
-	return { ...s, featured: !!s.featured, images, cover: images[0] || null }
+	let meta = {}
+	try {
+		meta = s.meta ? JSON.parse(s.meta) : {}
+	} catch (e) {
+		meta = {}
+	}
+	return { ...s, featured: !!s.featured, images, cover: images[0] || null, meta }
+}
+function metaString(v) {
+	if (v == null) return null
+	return typeof v === "string" ? v : JSON.stringify(v)
 }
 function ownCheck(user, vendorId) {
 	if (user.role === "admin") return
@@ -93,11 +103,12 @@ export const routes = [
 				? get("SELECT id FROM categories WHERE key=?", body.category_key)
 				: null
 			const info = run(
-				"INSERT INTO services (vendor_id,category_id,title,location,description,price,currency,duration,rating,reviews_count,featured,cancel_policy,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+				"INSERT INTO services (vendor_id,category_id,title,location,description,price,currency,duration,rating,reviews_count,featured,cancel_policy,status,meta,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 				vendor.id, cat ? cat.id : null, body.title || "Untitled",
 				body.location || null, body.description || null, Number(body.price) || 0,
-body.currency || "USD", body.duration || null, 0, 0,
+				body.currency || "USD", body.duration || null, 0, 0,
 				body.featured ? 1 : 0, body.cancel_policy || null, body.status || "active",
+				metaString(body.meta),
 				new Date().toISOString(),
 			)
 			const sid = Number(info.lastInsertRowid)
@@ -119,6 +130,8 @@ body.currency || "USD", body.duration || null, 0, 0,
 				if (f in body) run(`UPDATE services SET ${f}=? WHERE id=?`, body[f], s.id)
 			if ("featured" in body)
 				run("UPDATE services SET featured=? WHERE id=?", body.featured ? 1 : 0, s.id)
+			if ("meta" in body)
+				run("UPDATE services SET meta=? WHERE id=?", metaString(body.meta), s.id)
 			if ("category_key" in body) {
 				const c = get("SELECT id FROM categories WHERE key=?", body.category_key)
 				run("UPDATE services SET category_id=? WHERE id=?", c ? c.id : null, s.id)
