@@ -67,6 +67,8 @@
     '.rgpsl-pcat:hover{border-color:var(--blue);background:var(--blue-soft);transform:translateY(-2px)}',
     '.rgpsl-pci{width:46px;height:46px;border-radius:13px;background:var(--orange-soft);color:var(--orange);display:flex;align-items:center;justify-content:center}',
     '.rgpsl-pci svg{width:24px;height:24px}',
+    '.rgpsl-pother{border-style:dashed;border-color:var(--gold)}',
+    '.rgpsl-pother:hover{border-color:var(--gold);background:var(--orange-soft)}',
     '#rgpsl-pick .modal{max-width:640px}'
   ].join('');
   function injectCss(){
@@ -114,7 +116,7 @@
     var uncat=filtered.filter(function(s){ return !LIST.cats.some(function(c){ return c.id===s.category_id; }); });
     if(uncat.length) groups.push({cat:null, items:uncat});
     c.innerHTML=groups.map(function(g){
-      var name=g.cat?catLabel(g.cat):'Other';
+      var name=g.cat?catLabel(g.cat):'Other services';
       var key=g.cat?g.cat.key:'';
       return '<div class="rgpsl-group">'
         +'<div class="rgpsl-gh"><div class="rgpsl-gt">'+esc(name)+' <span class="rgpsl-gc">'+g.items.length+'</span></div>'
@@ -131,7 +133,7 @@
   function ensurePick(){
     if(el('rgpsl-pick')) return;
     var ov=document.createElement('div'); ov.className='overlay'; ov.id='rgpsl-pick';
-    ov.innerHTML='<div class="modal"><div class="rgpsl-phd"><h3 style="margin:0">Choose a service type</h3><button type="button" class="rgpsl-x" onclick="closeModal('+"'rgpsl-pick'"+')">&times;</button></div><p class="muted" style="margin:6px 0 14px;font-size:13px">Pick the type of service you provide. Each type has its own tailored form.</p><div class="rgpsl-pickgrid" id="rgpsl-pickgrid"></div></div>';
+    ov.innerHTML='<div class="modal"><div class="rgpsl-phd"><h3 style="margin:0">Choose a service type</h3><button type="button" class="rgpsl-x" onclick="closeModal('+"'rgpsl-pick'"+')">&times;</button></div><p class="muted" style="margin:6px 0 14px;font-size:13px">Pick the type of service you provide - or choose <b>Other</b> to propose a service that is not listed yet. New services go live after admin approval.</p><div class="rgpsl-pickgrid" id="rgpsl-pickgrid"></div></div>';
     document.body.appendChild(ov);
   }
   function rgpslPick(){
@@ -139,7 +141,8 @@
     var g=el('rgpsl-pickgrid');
     if(g) g.innerHTML=LIST.cats.map(function(c){
       return '<button type="button" class="rgpsl-pcat" onclick="rgpslNew('+"'"+esc(c.key)+"'"+')"><span class="rgpsl-pci">'+catIcon(c.key)+'</span><span>'+esc(catLabel(c))+'</span></button>';
-    }).join('');
+    }).join('')
+    +'<button type="button" class="rgpsl-pcat rgpsl-pother" onclick="rgpslNew('+"'__custom__'"+')"><span class="rgpsl-pci">'+((typeof window.iconSvg==='function')?window.iconSvg('sparkles'):'')+'</span><span>Other - not listed</span></button>';
     el('rgpsl-pick').classList.add('on');
   }
   async function rgpslNew(key){
