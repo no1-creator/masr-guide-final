@@ -2,12 +2,15 @@
  * RaGo - Per-category service field definitions (frontend-only, additive)
  * Consumed by dashboard-svc-editor.js to render tailored, professional
  * options for each service type. Values are persisted to service.meta.
- * Field types: text | textarea | number | select | checkbox | multi
+ * Field types: text | textarea | number | select | combo | checkbox | multi
+ *   - select : strict list (finite / binary values only)
+ *   - combo  : suggestions list + the provider can also type a custom value
+ *   - multi  : comma-separated free text (already open)
  * ===================================================================== */
 window.RGP_SVC_FIELDS = {
   "airport": [
     {"k":"direction","l":"Service direction","t":"select","o":["Arrival","Departure","Both"]},
-    {"k":"vehicle_type","l":"Vehicle type","t":"select","o":["Sedan","SUV","Van","Minibus","Bus"]},
+    {"k":"vehicle_type","l":"Vehicle type","t":"combo","o":["Sedan","SUV","Van","Minibus","Bus"]},
     {"k":"passengers","l":"Max passengers","t":"number"},
     {"k":"luggage","l":"Luggage capacity","t":"number"},
     {"k":"route","l":"Route (from - to)","t":"text","p":"e.g. Cairo Airport - Downtown hotel"},
@@ -25,7 +28,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"required_docs","l":"Required documents","t":"textarea","p":"Passport, photo, ..."}
   ],
   "transfers": [
-    {"k":"vehicle_type","l":"Vehicle type","t":"select","o":["Sedan","SUV","Van","Minibus","Bus"]},
+    {"k":"vehicle_type","l":"Vehicle type","t":"combo","o":["Sedan","SUV","Van","Minibus","Bus"]},
     {"k":"passengers","l":"Max passengers","t":"number"},
     {"k":"trip_type","l":"Trip type","t":"select","o":["One-way","Round-trip"]},
     {"k":"from","l":"From","t":"text"},
@@ -47,7 +50,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"trip_type","l":"Trip type","t":"select","o":["Group","Private"]},
     {"k":"destination","l":"Destination","t":"text","p":"e.g. Luxor & Aswan"},
     {"k":"days","l":"Number of days","t":"number"},
-    {"k":"transport","l":"Transport","t":"select","o":["Bus","Van","Private car","Flight","Train","Boat","Mixed"]},
+    {"k":"transport","l":"Transport","t":"combo","o":["Bus","Van","Private car","Flight","Train","Boat","Mixed"]},
     {"k":"meeting_point","l":"Meeting / pickup point","t":"text"},
     {"k":"pickup_included","l":"Hotel pickup included","t":"checkbox"},
     {"k":"min_pax","l":"Minimum travellers","t":"number"},
@@ -69,7 +72,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"excludes","l":"What is not included","t":"textarea"}
   ],
   "nile-cruise": [
-    {"k":"route","l":"Cruise route","t":"select","o":["Luxor to Aswan","Aswan to Luxor","Round trip"]},
+    {"k":"route","l":"Cruise route","t":"combo","o":["Luxor to Aswan","Aswan to Luxor","Round trip"]},
     {"k":"nights","l":"Number of nights","t":"number"},
     {"k":"cabin_types","l":"Cabin types","t":"multi","p":"Standard, Deluxe, Suite"},
     {"k":"board","l":"Board basis","t":"select","o":["Half board","Full board","All inclusive"]},
@@ -77,7 +80,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"excursions_included","l":"Excursions included","t":"checkbox"}
   ],
   "diving": [
-    {"k":"dive_type","l":"Dive type","t":"select","o":["Intro dive","Certified dive","Course","Snorkeling"]},
+    {"k":"dive_type","l":"Dive type","t":"combo","o":["Intro dive","Certified dive","Course","Snorkeling"]},
     {"k":"dives_count","l":"Number of dives","t":"number"},
     {"k":"depth","l":"Max depth","t":"text","p":"e.g. 18m"},
     {"k":"entry","l":"Entry","t":"select","o":["Boat","Shore"]},
@@ -86,7 +89,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"courses","l":"Courses offered","t":"multi","p":"Open Water, Advanced, ..."}
   ],
   "safari": [
-    {"k":"safari_type","l":"Safari type","t":"select","o":["Jeep 4x4","Camel","Quad bike","Walking","Mixed"]},
+    {"k":"safari_type","l":"Safari type","t":"combo","o":["Jeep 4x4","Camel","Quad bike","Walking","Mixed"]},
     {"k":"duration","l":"Duration","t":"text","p":"e.g. 3 hours"},
     {"k":"overnight","l":"Overnight camping","t":"checkbox"},
     {"k":"pickup_included","l":"Hotel pickup included","t":"checkbox"},
@@ -94,7 +97,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"includes","l":"What is included","t":"textarea"}
   ],
   "carrental": [
-    {"k":"car_type","l":"Car category","t":"select","o":["Economy","Compact","SUV","Luxury","Van"]},
+    {"k":"car_type","l":"Car category","t":"combo","o":["Economy","Compact","SUV","Luxury","Van"]},
     {"k":"transmission","l":"Transmission","t":"select","o":["Manual","Automatic"]},
     {"k":"seats","l":"Seats","t":"number"},
     {"k":"with_driver","l":"With driver","t":"checkbox"},
@@ -117,7 +120,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"validity_days","l":"Validity (days)","t":"number"},
     {"k":"network","l":"Network / operator","t":"text"},
     {"k":"calls_included","l":"Calls & SMS included","t":"checkbox"},
-    {"k":"delivery","l":"Delivery method","t":"select","o":["Airport pickup","Hotel delivery","Instant eSIM"]}
+    {"k":"delivery","l":"Delivery method","t":"combo","o":["Airport pickup","Hotel delivery","Instant eSIM"]}
   ],
   "dining": [
     {"k":"cuisine","l":"Cuisine","t":"multi","p":"Egyptian, Seafood, ..."},
@@ -158,7 +161,7 @@ window.RGP_SVC_FIELDS = {
     {"k":"claim_process","l":"Claim process","t":"textarea"}
   ],
   "departure": [
-    {"k":"vehicle_type","l":"Vehicle type","t":"select","o":["Sedan","SUV","Van","Minibus","Bus"]},
+    {"k":"vehicle_type","l":"Vehicle type","t":"combo","o":["Sedan","SUV","Van","Minibus","Bus"]},
     {"k":"passengers","l":"Max passengers","t":"number"},
     {"k":"pickup_location","l":"Pickup location","t":"text"},
     {"k":"airport","l":"Destination airport","t":"text"},
