@@ -137,6 +137,11 @@
       var opts='<option value=""></option>'+(f.o||[]).map(function(o){ return '<option value="'+esc(o)+'"'+((val!=null&&String(val)===String(o))?' selected':'')+'>'+esc(o)+'</option>'; }).join('');
       return '<div class="field"><label>'+esc(f.l)+'</label><select id="'+id+'">'+opts+'</select></div>';
     }
+    if(f.t==='combo'){
+      var dlid='rgpsv-dl-'+f.k;
+      var dopts=(f.o||[]).map(function(o){ return '<option value="'+esc(o)+'"></option>'; }).join('');
+      return '<div class="field"><label>'+esc(f.l)+'</label><input id="'+id+'" list="'+dlid+'" value="'+(val==null?'':esc(val))+'"'+rgpPh(f)+'><datalist id="'+dlid+'">'+dopts+'</datalist><span class="rgpsv-hint2">Choose a suggestion or type your own</span></div>';
+    }
     if(f.t==='number') return '<div class="field"><label>'+esc(f.l)+'</label><input id="'+id+'" type="number" min="0" value="'+(val==null?'':esc(val))+'"></div>';
     if(f.t==='multi'){
       var mv=Array.isArray(val)?val.join(', '):(val==null?'':val);
