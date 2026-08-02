@@ -29,6 +29,13 @@
     {k:'Non-refundable',t:'This booking is non-refundable once it is confirmed.'}
   ];
   var CURRENCIES=['USD','EUR','GBP','EGP','SAR','AED'];
+  var CUSTOM_KEY='__custom__';
+  var CUSTOM_FIELDS=[
+    {k:'custom_type',l:'What kind of service is this?',t:'text',p:'e.g. Hot air balloon ride, Cooking class, Fishing trip'},
+    {k:'highlights',l:'Highlights',t:'multi',p:'e.g. Hotel pickup, English guide, Lunch included'},
+    {k:'includes',l:'What is included',t:'textarea',p:'List everything the guest gets...'},
+    {k:'good_to_know',l:'Good to know / requirements',t:'textarea',p:'Age limits, what to bring, meeting point, timing...'}
+  ];
 
   var CSS=[
     '#rgpsv-modal .modal{max-width:720px}',
@@ -60,7 +67,8 @@
     '.rgpsv-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}',
     '.rgpsv-grid .full{grid-column:1 / -1}',
     '.rgpsv-chk{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin:2px 0 12px;padding:10px 12px;background:var(--soft);border-radius:10px;cursor:pointer}',
-    '.rgpsv-hint2{display:block;color:var(--text2);font-size:11.5px;margin-top:3px}'
+    '.rgpsv-hint2{display:block;color:var(--text2);font-size:11.5px;margin-top:3px}',
+    '.rgpsv-note{background:var(--orange-soft);color:#8a5a1e;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:12px}'
   ].join('');
 
   function injectCss(){
@@ -77,7 +85,7 @@
       +'<div class="rgpsv-sec"><div class="rgpsv-lg">Basics</div>'
       +'<div class="field"><label>Title</label><input id="rgpsv-title" placeholder="e.g. Giza Pyramids &amp; Sphinx Half-Day Tour"></div>'
       +'<div class="row"><div class="field"><label>Category</label><select id="rgpsv-cat" onchange="rgpSvcCatChange()"></select></div><div class="field"><label>Location</label><input id="rgpsv-loc" placeholder="City / area"></div></div></div>'
-      +'<div class="rgpsv-sec"><div class="rgpsv-lg" id="rgpsv-dynhd">Service details</div><div class="rgpsv-grid" id="rgpsv-dyn"></div></div>'
+      +'<div class="rgpsv-sec"><div class="rgpsv-lg" id="rgpsv-dynhd">Service details</div><div id="rgpsv-note-wrap"></div><div class="rgpsv-grid" id="rgpsv-dyn"></div></div>'
       +'<div class="rgpsv-sec"><div class="rgpsv-lg">Pricing &amp; duration</div>'
       +'<div class="row"><div class="field"><label>Price</label><input id="rgpsv-price" type="number" min="0"></div><div class="field"><label>Currency</label><select id="rgpsv-cur"></select></div><div class="field"><label>Duration</label><input id="rgpsv-dur" placeholder="e.g. 8h / 3 days"></div></div></div>'
       +'<div class="rgpsv-sec"><div class="rgpsv-lg">Description</div>'
@@ -123,9 +131,11 @@
   }
 
   function rgpPh(f){ return f.p?(' placeholder="'+esc(f.p)+'"'):''; }
+  function rgpIsCustom(){ var sel=el('rgpsv-cat'); return !!sel && sel.value===CUSTOM_KEY; }
   function rgpCurFields(){
     var sel=el('rgpsv-cat');
     var key=sel?sel.value:'';
+    if(key===CUSTOM_KEY) return CUSTOM_FIELDS;
     var map=window.RGP_SVC_FIELDS||{};
     return map[key]||[];
   }
@@ -151,6 +161,10 @@
   }
   function rgpRenderFields(){
     var c=el('rgpsv-dyn'); if(!c) return;
+    var custom=rgpIsCustom();
+    var hd=el('rgpsv-dynhd'); if(hd) hd.textContent=custom?'New service - details':'Service details';
+    var nw=el('rgpsv-note-wrap');
+    if(nw) nw.innerHTML=custom?'<div class="rgpsv-note">You are proposing a service that is not listed on the platform yet. Fill in the details below - once you save, it will be sent to the admin for review and goes live after approval.</div>':'';
     var fields=rgpCurFields();
     if(!fields.length){ c.innerHTML='<p class="rgpsv-hint">Pick a category above to unlock its tailored options.</p>'; return; }
     c.innerHTML=fields.map(function(f){ return rgpFieldHtml(f, SVC.meta[f.k]); }).join('');
@@ -199,7 +213,7 @@
   async function rgpOpenService(id){
     ensureModal();
     try{ SVC.cats=await api('/api/categories'); }catch(e){ SVC.cats=[]; }
-    el('rgpsv-cat').innerHTML=SVC.cats.map(function(c){ return '<option value="'+esc(c.key)+'">'+esc((c.labels&&c.labels.en)||c.key)+'</option>'; }).join('');
+    el('rgpsv-cat').innerHTML=SVC.cats.map(function(c){ return '<option value="'+esc(c.key)+'">'+esc((c.labels&&c.labels.en)||c.key)+'</option>'; }).join('')+'<option value="'+CUSTOM_KEY+'">Other - a service not listed</option>';
     el('rgpsv-cur').innerHTML=CURRENCIES.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
     el('rgpsv-pol').innerHTML=POLICIES.map(function(p){ return '<option value="'+esc(p.k)+'">'+esc(p.k)+'</option>'; }).join('')+'<option value="Custom">Custom...</option>';
     SVC.id=null; SVC.images=[]; SVC.avail=[]; SVC.meta={};
@@ -216,6 +230,7 @@
       el('rgpsv-feat').checked=!!s.featured;
       var cat=SVC.cats.filter(function(c){ return c.id===s.category_id; })[0];
       if(cat) el('rgpsv-cat').value=cat.key;
+      else el('rgpsv-cat').value=CUSTOM_KEY;
       SVC.meta=(s.meta&&typeof s.meta==='object'&&!Array.isArray(s.meta))?s.meta:{};
       SVC.images=(s.images||[]).slice();
       SVC.avail=(s.availability||[]).map(function(a){ return {date:a.date,slots:Number(a.slots)||0}; });
@@ -238,9 +253,10 @@
 
   async function rgpSaveService(){
     rgpCollectMeta();
+    var catKey=el('rgpsv-cat').value;
     var body={
       title:el('rgpsv-title').value,
-      category_key:el('rgpsv-cat').value,
+      category_key:(catKey===CUSTOM_KEY?'':catKey),
       location:el('rgpsv-loc').value,
       price:Number(el('rgpsv-price').value)||0,
       currency:el('rgpsv-cur').value||'USD',
@@ -264,7 +280,7 @@
         }
       }
       el('rgpsv-modal').classList.remove('on');
-      toast('Saved');
+      toast(SVC.id?'Saved':'Sent for review');
       if(typeof window.loadSec==='function') window.loadSec();
     }catch(e){ toast((e&&e.message)||'Save failed'); }
   }
