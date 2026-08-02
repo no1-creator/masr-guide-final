@@ -131,6 +131,13 @@ export function migrate() {
 	try {
 		db.exec("ALTER TABLE bookings ADD COLUMN details TEXT")
 	} catch (e) {}
+
+	// Additive & idempotent: per-service custom attributes (JSON string).
+	// Each service type exposes its own professional fields; stored here
+	// without touching any existing column or data.
+	try {
+		db.exec("ALTER TABLE services ADD COLUMN meta TEXT")
+	} catch (e) {}
 }
 
 // Tiny query helpers.
