@@ -107,7 +107,7 @@
     }).join('');
   }
 
-  function rgpslSearch(v){ LIST.q=v||''; renderBody(); }
+  function rgpslSearch(v){ v=v||''; if(/@/.test(v)){ var i=el('rgpsl-q'); if(i) i.value=''; return; } LIST.q=v; renderBody(); }
   function rgpslFilter(v){ LIST.cat=v||''; renderBody(); }
   function rgpslEdit(id){ if(typeof window.openService==='function') window.openService(id); }
   function rgpslDel(id){ if(typeof window.delService==='function') window.delService(id); }
@@ -148,7 +148,7 @@
     var catOpts='<option value="">All service types ('+LIST.mine.length+')</option>'
       +LIST.cats.filter(function(c){ return offered[c.id]; }).map(function(c){ return '<option value="'+c.id+'"'+(String(LIST.cat)===String(c.id)?' selected':'')+'>'+esc(catLabel(c))+' ('+offered[c.id]+')</option>'; }).join('');
     var head='<div class="rgpsl-bar">'
-      +'<input id="rgpsl-q" class="rgpsl-search" type="search" placeholder="Search your services..." oninput="rgpslSearch(this.value)" value="'+esc(LIST.q)+'">'
+      +'<input id="rgpsl-q" class="rgpsl-search" type="text" name="rago-svc-search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('+"'readonly'"+')" placeholder="Search your services..." oninput="rgpslSearch(this.value)" value="'+esc(LIST.q)+'">'
       +'<select id="rgpsl-catf" class="rgpsl-catf" onchange="rgpslFilter(this.value)">'+catOpts+'</select></div>';
     var actions='<button class="rgp-pbtn gold" onclick="rgpslPick()">'+plusIcon()+'New service</button>';
     var sub='You offer '+offeredCount+' service type'+(offeredCount===1?'':'s')+' · '+LIST.mine.length+' listing'+(LIST.mine.length===1?'':'s')+' total.';
