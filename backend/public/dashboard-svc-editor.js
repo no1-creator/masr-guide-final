@@ -1,20 +1,22 @@
 /* =====================================================================
- * RaGo - Premium service editor (frontend-only, v1)
+ * RaGo - Premium service editor (frontend-only, v2)
  * A professional, multi-section editor for providers with real,
  * backend-persisted options: category, location, price + currency,
  * duration, rich description, photo gallery (cover + remove),
- * cancellation policy (presets or custom) and per-date availability
- * with slots.
+ * cancellation policy (presets or custom), per-date availability with
+ * slots, and PER-CATEGORY tailored fields (each service type has its
+ * own set of details/controls, saved to service.meta).
  *
  * SAFE & ADDITIVE: builds its OWN modal and overrides window.openService
- * and window.saveService. Reuses window.api / toast / esc / loadSec.
+ * and window.saveService. Reuses window.api / toast / esc / loadSec and
+ * window.RGP_SVC_FIELDS (from dashboard-svc-fields.js).
  * ===================================================================== */
 (function(){
   'use strict';
   if(window.__ragoSvcEditor) return;
   window.__ragoSvcEditor=true;
 
-  var SVC={id:null,images:[],avail:[],cats:[]};
+  var SVC={id:null,images:[],avail:[],cats:[],meta:{}};
   function api(p,o){ return window.api(p,o); }
   function esc(s){ return (typeof window.esc==='function')?window.esc(s):String(s==null?'':s); }
   function toast(m){ if(typeof window.toast==='function') window.toast(m); }
@@ -54,7 +56,11 @@
     '.rgpsv-addrow input.s{width:120px}',
     '.rgpsv-feat{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin-top:16px;padding:12px 14px;background:var(--soft);border-radius:11px;cursor:pointer}',
     '.rgpsv-foot{display:flex;gap:10px;margin-top:18px}',
-    '.rgpsv-hint{color:var(--text2);font-size:12.5px;margin:6px 0 0}'
+    '.rgpsv-hint{color:var(--text2);font-size:12.5px;margin:6px 0 0}',
+    '.rgpsv-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}',
+    '.rgpsv-grid .full{grid-column:1 / -1}',
+    '.rgpsv-chk{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin:2px 0 12px;padding:10px 12px;background:var(--soft);border-radius:10px;cursor:pointer}',
+    '.rgpsv-hint2{display:block;color:var(--text2);font-size:11.5px;margin-top:3px}'
   ].join('');
 
   function injectCss(){
@@ -70,7 +76,8 @@
       +'<div class="rgpsv-head"><h3 id="rgpsv-hd">New service</h3><button type="button" class="rgpsv-x" onclick="closeModal('+"'rgpsv-modal'"+')">&times;</button></div>'
       +'<div class="rgpsv-sec"><div class="rgpsv-lg">Basics</div>'
       +'<div class="field"><label>Title</label><input id="rgpsv-title" placeholder="e.g. Giza Pyramids &amp; Sphinx Half-Day Tour"></div>'
-      +'<div class="row"><div class="field"><label>Category</label><select id="rgpsv-cat"></select></div><div class="field"><label>Location</label><input id="rgpsv-loc" placeholder="City / area"></div></div></div>'
+      +'<div class="row"><div class="field"><label>Category</label><select id="rgpsv-cat" onchange="rgpSvcCatChange()"></select></div><div class="field"><label>Location</label><input id="rgpsv-loc" placeholder="City / area"></div></div></div>'
+      +'<div class="rgpsv-sec"><div class="rgpsv-lg" id="rgpsv-dynhd">Service details</div><div class="rgpsv-grid" id="rgpsv-dyn"></div></div>'
       +'<div class="rgpsv-sec"><div class="rgpsv-lg">Pricing &amp; duration</div>'
       +'<div class="row"><div class="field"><label>Price</label><input id="rgpsv-price" type="number" min="0"></div><div class="field"><label>Currency</label><select id="rgpsv-cur"></select></div><div class="field"><label>Duration</label><input id="rgpsv-dur" placeholder="e.g. 8h / 3 days"></div></div></div>'
       +'<div class="rgpsv-sec"><div class="rgpsv-lg">Description</div>'
@@ -115,6 +122,46 @@
     }).join('')||'<p class="rgpsv-hint">No dates yet - add availability so guests can pick a day.</p>';
   }
 
+  function rgpPh(f){ return f.p?(' placeholder="'+esc(f.p)+'"'):''; }
+  function rgpCurFields(){
+    var sel=el('rgpsv-cat');
+    var key=sel?sel.value:'';
+    var map=window.RGP_SVC_FIELDS||{};
+    return map[key]||[];
+  }
+  function rgpFieldHtml(f,val){
+    var id='rgpsv-m-'+f.k;
+    if(f.t==='textarea') return '<div class="field full"><label>'+esc(f.l)+'</label><textarea id="'+id+'" rows="3"'+rgpPh(f)+'>'+esc(val==null?'':val)+'</textarea></div>';
+    if(f.t==='checkbox') return '<label class="rgpsv-chk full"><input type="checkbox" id="'+id+'"'+(val?' checked':'')+'> <span>'+esc(f.l)+'</span></label>';
+    if(f.t==='select'){
+      var opts='<option value=""></option>'+(f.o||[]).map(function(o){ return '<option value="'+esc(o)+'"'+((val!=null&&String(val)===String(o))?' selected':'')+'>'+esc(o)+'</option>'; }).join('');
+      return '<div class="field"><label>'+esc(f.l)+'</label><select id="'+id+'">'+opts+'</select></div>';
+    }
+    if(f.t==='number') return '<div class="field"><label>'+esc(f.l)+'</label><input id="'+id+'" type="number" min="0" value="'+(val==null?'':esc(val))+'"></div>';
+    if(f.t==='multi'){
+      var mv=Array.isArray(val)?val.join(', '):(val==null?'':val);
+      return '<div class="field full"><label>'+esc(f.l)+'</label><input id="'+id+'" value="'+esc(mv)+'"'+rgpPh(f)+'><span class="rgpsv-hint2">Separate multiple values with commas</span></div>';
+    }
+    return '<div class="field"><label>'+esc(f.l)+'</label><input id="'+id+'" value="'+(val==null?'':esc(val))+'"'+rgpPh(f)+'></div>';
+  }
+  function rgpRenderFields(){
+    var c=el('rgpsv-dyn'); if(!c) return;
+    var fields=rgpCurFields();
+    if(!fields.length){ c.innerHTML='<p class="rgpsv-hint">Pick a category above to unlock its tailored options.</p>'; return; }
+    c.innerHTML=fields.map(function(f){ return rgpFieldHtml(f, SVC.meta[f.k]); }).join('');
+  }
+  function rgpCollectMeta(){
+    var fields=rgpCurFields();
+    fields.forEach(function(f){
+      var e=el('rgpsv-m-'+f.k); if(!e) return;
+      if(f.t==='checkbox') SVC.meta[f.k]=e.checked;
+      else if(f.t==='number') SVC.meta[f.k]=(e.value===''?null:Number(e.value));
+      else if(f.t==='multi') SVC.meta[f.k]=e.value.split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x; });
+      else SVC.meta[f.k]=e.value;
+    });
+  }
+  function rgpSvcCatChange(){ rgpCollectMeta(); rgpRenderFields(); }
+
   function rgpSvcFiles(e){
     var files=e.target.files; if(!files) return;
     Array.prototype.forEach.call(files,function(f){
@@ -150,7 +197,7 @@
     el('rgpsv-cat').innerHTML=SVC.cats.map(function(c){ return '<option value="'+esc(c.key)+'">'+esc((c.labels&&c.labels.en)||c.key)+'</option>'; }).join('');
     el('rgpsv-cur').innerHTML=CURRENCIES.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
     el('rgpsv-pol').innerHTML=POLICIES.map(function(p){ return '<option value="'+esc(p.k)+'">'+esc(p.k)+'</option>'; }).join('')+'<option value="Custom">Custom...</option>';
-    SVC.id=null; SVC.images=[]; SVC.avail=[];
+    SVC.id=null; SVC.images=[]; SVC.avail=[]; SVC.meta={};
     if(id){
       var s=await api('/api/services/'+id);
       SVC.id=s.id;
@@ -164,6 +211,7 @@
       el('rgpsv-feat').checked=!!s.featured;
       var cat=SVC.cats.filter(function(c){ return c.id===s.category_id; })[0];
       if(cat) el('rgpsv-cat').value=cat.key;
+      SVC.meta=(s.meta&&typeof s.meta==='object'&&!Array.isArray(s.meta))?s.meta:{};
       SVC.images=(s.images||[]).slice();
       SVC.avail=(s.availability||[]).map(function(a){ return {date:a.date,slots:Number(a.slots)||0}; });
       var pol=s.cancel_policy||'';
@@ -179,11 +227,12 @@
       el('rgpsv-pol').value='Flexible';
       el('rgpsv-poltext').value=POLICIES[0].t;
     }
-    rgpRenderThumbs(); rgpRenderAvail();
+    rgpRenderThumbs(); rgpRenderAvail(); rgpRenderFields();
     el('rgpsv-modal').classList.add('on');
   }
 
   async function rgpSaveService(){
+    rgpCollectMeta();
     var body={
       title:el('rgpsv-title').value,
       category_key:el('rgpsv-cat').value,
@@ -194,6 +243,7 @@
       description:el('rgpsv-desc').value,
       cancel_policy:el('rgpsv-poltext').value,
       featured:el('rgpsv-feat').checked,
+      meta:SVC.meta,
       images:SVC.images
     };
     if(!body.title){ toast('Please enter a title'); return; }
@@ -223,4 +273,5 @@
   window.rgpSvcAddAvail=rgpSvcAddAvail;
   window.rgpSvcRmAvail=rgpSvcRmAvail;
   window.rgpSvcPolicy=rgpSvcPolicy;
+  window.rgpSvcCatChange=rgpSvcCatChange;
 })();
