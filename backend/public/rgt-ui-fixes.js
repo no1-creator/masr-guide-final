@@ -546,3 +546,42 @@
   }
   window.renderAuth()
 })()
+
+/* RaGo - Admin overview polish (additive, isolated).
+ * Overrides only the admin:overview panel to be richer: fuller KPI grid with
+ * average booking value, recent bookings with the details viewer, and a
+ * top-marketers table. Other admin panels are untouched. */
+(function () {
+  'use strict'
+  if (typeof SEC === 'undefined') return
+
+  function stat(n, l) { return '<div class="stat"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>' }
+  function num(x) { return Number(x) || 0 }
+
+  SEC['admin:overview'] = async function (m) {
+    var o = await api('/api/admin/overview')
+    var b = await api('/api/bookings').catch(function () { return [] })
+    b = (b || []).slice().sort(function (a, c) { return num(c.id) - num(a.id) })
+    var pending = b.filter(function (x) { return x.status === 'pending' }).length
+    var done = b.filter(function (x) { return x.status === 'confirmed' || x.status === 'completed' })
+    var avg = done.length ? (num(o.revenue) / done.length) : 0
+    m.innerHTML = '<div class="stats">'
+      + stat(o.vendors, 'Providers')
+      + stat(o.services, 'Services')
+      + stat(o.affiliates, 'Marketers')
+      + stat(o.customers, 'Customers')
+      + stat(o.bookings, 'Bookings')
+      + stat(pending, 'Pending')
+      + stat(money(o.revenue), 'Revenue')
+      + stat(money(avg), 'Avg booking')
+      + stat(money(o.platform_commission), 'Platform commission')
+      + stat(o.pending_payouts, 'Pending payouts')
+      + '</div>'
+      + '<h3 style="margin:6px 0 8px">Recent bookings</h3>'
+      + (b.length ? bookingsTable(b.slice(0, 8)) : '<p class="muted">No bookings yet.</p>')
+      + '<h3 style="margin:20px 0 8px">Top marketers</h3>'
+      + tbl(['Name', 'Code', 'Clicks', 'Bookings'], (o.top_affiliates || []).map(function (a) {
+        return [esc(a.name || '\u2014'), '<code>' + esc(a.code || '') + '</code>', a.clicks, a.bookings]
+      }))
+  }
+})()
