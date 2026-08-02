@@ -1,17 +1,45 @@
 /* =====================================================================
- * RaGo - World-class dashboards (frontend-only, v3, rewritten from scratch)
- * Premium, cohesive Overview screens for Admin / Provider / Marketer:
- *   - welcome banner with quick-action buttons
- *   - refined KPI cards with sparklines + tasteful trend badges
- *   - revenue bar chart, booking-status breakdown, recent-activity panels
- * Consistent RaGo palette, spacing, radius and iconography throughout.
+ * RaGo - World-class dashboards (frontend-only, v4)
+ * Premium, cohesive Overview screens for Admin / Provider / Marketer.
+ * v4: modern line-icon set (Lucide-style) for KPI cards + hero actions,
+ *     and a redesigned, cohesive sidebar menu (icons + active state).
  *
- * SAFE & ADDITIVE: wraps the global loadSec(); only the Overview screen of
- * admin/vendor/affiliate is taken over - every other section/role falls
- * through to the original renderer, and any error falls back silently.
+ * SAFE & ADDITIVE: wraps the global loadSec() and renderNav(); only the
+ * Overview screen of admin/vendor/affiliate is taken over, and menu icons
+ * are swapped after each render. Any error falls back silently.
  * ===================================================================== */
 (function () {
   'use strict';
+
+  var RGP_ICONS={
+    grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
+    store:'<path d="M3 9l1.6-5h14.8L21 9"/><path d="M4 9v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M3 9h18"/><path d="M9 19v-5h6v5"/>',
+    compass:'<circle cx="12" cy="12" r="9"/><polygon points="16.2 7.8 14.1 14.1 7.8 16.2 9.9 9.9"/>',
+    ticket:'<path d="M4 7a2 2 0 0 0-2 2v1.5a1.5 1.5 0 0 1 0 3V15a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-1.5a1.5 1.5 0 0 1 0-3V9a2 2 0 0 0-2-2z"/><path d="M13 7v10"/>',
+    users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    star:'<polygon points="12 2.5 14.9 8.4 21.5 9.3 16.7 13.9 17.9 20.5 12 17.4 6.1 20.5 7.3 13.9 2.5 9.3 9.1 8.4"/>',
+    image:'<rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="m21 15-4.5-4.5L5 21"/>',
+    megaphone:'<path d="M4 10v4a1 1 0 0 0 1 1h3l6 4V5L8 9H5a1 1 0 0 0-1 1z"/><path d="M18 9a3 3 0 0 1 0 6"/>',
+    wallet:'<path d="M3 8a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v1"/><path d="M3 8v9a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-2"/><path d="M21 11h-4a2 2 0 0 0 0 4h4a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z"/>',
+    gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.9 7.9 0 0 0 .1-2l1.9-1.5-2-3.4-2.3 1a8 8 0 0 0-1.7-1l-.4-2.4H10.9l-.4 2.4a8 8 0 0 0-1.7 1l-2.3-1-2 3.4L6.5 11a7.9 7.9 0 0 0 0 2l-1.9 1.5 2 3.4 2.3-1a8 8 0 0 0 1.7 1l.4 2.4h4.2l.4-2.4a8 8 0 0 0 1.7-1l2.3 1 2-3.4z"/>',
+    user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    link:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+    sparkles:'<path d="M12 3l1.8 4.9L18.7 9l-4.9 1.8L12 15.7l-1.8-4.9L5.3 9l4.9-1.1z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>'
+  };
+  var NAVMAP={overview:'grid',vendors:'store',services:'compass',bookings:'ticket',customers:'users',reviews:'star',banners:'image',marketers:'megaphone',payouts:'wallet',settings:'gear',grouptrips:'users',link:'link',wallet:'wallet',profile:'user'};
+  function svgWrap(p){ return '<svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>'; }
+  function svgEl(html){ var t=document.createElement('div'); t.innerHTML=html; return t.firstChild; }
+  function modernizeNav(){
+    var nav=document.getElementById('dnav'); if(!nav) return;
+    Array.prototype.forEach.call(nav.querySelectorAll('button'), function(btn){
+      var oc=btn.getAttribute('onclick')||''; var key='';
+      var a=oc.indexOf("navTo('"); if(a>=0){ var b=oc.indexOf("'", a+7); if(b>a) key=oc.slice(a+7,b); }
+      var nm=NAVMAP[key]||'grid';
+      var ns=svgEl(svgWrap(RGP_ICONS[nm]||RGP_ICONS.grid));
+      var cur=btn.querySelector('svg');
+      if(cur){ cur.parentNode.replaceChild(ns,cur); } else { btn.insertBefore(ns, btn.firstChild); }
+    });
+  }
 
   var CSS = [
     '.rgp{animation:rgpIn .3s ease}',
@@ -66,7 +94,14 @@
     '.rgp-brh b{font-size:14px;color:var(--text)}',
     '.rgp-brt{height:9px;background:var(--soft2);border-radius:999px;overflow:hidden}',
     '.rgp-brf{height:100%;border-radius:999px;transition:width .6s ease}',
-    '@media(max-width:760px){.rgp-panels{grid-template-columns:1fr}.rgp-hero{padding:18px}}'
+    '@media(max-width:760px){.rgp-panels{grid-template-columns:1fr}.rgp-hero{padding:18px}}',
+    '#dnav{display:flex;flex-direction:column;gap:4px}',
+    '#dnav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:none;background:transparent;color:var(--text2);font-family:inherit;font-weight:600;font-size:14px;padding:10px 13px;border-radius:11px;cursor:pointer;transition:background .15s,color .15s}',
+    '#dnav button svg{width:18px;height:18px;flex:0 0 auto;opacity:.85}',
+    '#dnav button:hover{background:var(--soft2);color:var(--text)}',
+    '#dnav button.on{background:var(--blue);color:#fff}',
+    '#dnav button.on svg{opacity:1}',
+    '@media(max-width:760px){#dnav{flex-direction:row;flex-wrap:wrap}#dnav button{width:auto}}'
   ].join('');
 
   function injectStyles(){
@@ -78,7 +113,7 @@
   }
 
   function money2(n){ return (typeof window.money==='function') ? window.money(n) : ('$'+Number(n||0).toLocaleString()); }
-  function icon(n){ return (typeof window.iconSvg==='function') ? window.iconSvg(n) : ''; }
+  function icon(n){ var p=RGP_ICONS[n]; if(p) return svgWrap(p); return (typeof window.iconSvg==='function') ? window.iconSvg(n) : ''; }
   function esc2(s){ return (typeof window.esc==='function') ? window.esc(s) : String(s==null?'':s); }
   function tbl2(h,r){ return (typeof window.tbl==='function') ? window.tbl(h,r) : ''; }
   function bookingsTable2(b){ return (typeof window.bookingsTable==='function') ? window.bookingsTable(b) : ''; }
@@ -256,6 +291,15 @@
     if(window.__ragoDpInstalled) return true;
     if(typeof window.loadSec!=='function') return false;
     injectStyles();
+    try{
+      var _rn=window.renderNav;
+      if(typeof _rn==='function' && !_rn.__rgpWrapped){
+        var wrapped=function(){ var r=_rn.apply(this, arguments); try{ modernizeNav(); }catch(e){} return r; };
+        wrapped.__rgpWrapped=true;
+        window.renderNav=wrapped;
+      }
+      modernizeNav();
+    }catch(e){}
     var _orig=window.loadSec;
     window.loadSec=async function(){
       var role=currentRole(), sec=currentSection();
