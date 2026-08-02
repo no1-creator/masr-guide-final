@@ -9,8 +9,6 @@
  * SAFE & ADDITIVE: wraps the global loadSec(); only the Overview screen of
  * admin/vendor/affiliate is taken over - every other section/role falls
  * through to the original renderer, and any error falls back silently.
- * Uses only global helpers (money, iconSvg, esc, tbl, statusTag,
- * bookingsTable, api, navTo, openService).
  * ===================================================================== */
 (function () {
   'use strict';
@@ -143,4 +141,142 @@
     }).join('')+'</div>';
   }
   function panel(title, sub, body){
-    return '
+    return '<div class="rgp-panel"><div class="rgp-ph"><div class="rgp-pt">'+title+'</div>'+(sub?'<div class="rgp-ps">'+sub+'</div>':'')+'</div>'+body+'</div>';
+  }
+  function hero(role){
+    var names={admin:'Platform admin',vendor:'Your business',affiliate:'Your marketing'};
+    var chip=document.getElementById('user-chip');
+    var who=(chip && chip.textContent) ? chip.textContent.trim() : '';
+    var acts='';
+    if(role==='admin') acts='<button class="rgp-act gold" onclick="navTo(&#39;vendors&#39;)">'+icon('store')+'Providers</button><button class="rgp-act" onclick="navTo(&#39;bookings&#39;)">'+icon('ticket')+'Bookings</button><button class="rgp-act" onclick="navTo(&#39;payouts&#39;)">'+icon('wallet')+'Payouts</button>';
+    else if(role==='vendor') acts='<button class="rgp-act gold" onclick="openService()">'+icon('compass')+'New service</button><button class="rgp-act" onclick="navTo(&#39;bookings&#39;)">'+icon('ticket')+'Bookings</button><button class="rgp-act" onclick="navTo(&#39;wallet&#39;)">'+icon('wallet')+'Wallet</button>';
+    else acts='<button class="rgp-act gold" onclick="navTo(&#39;link&#39;)">'+icon('link')+'My link</button><button class="rgp-act" onclick="navTo(&#39;bookings&#39;)">'+icon('ticket')+'Bookings</button>';
+    return '<div class="rgp-hero"><div class="rgp-hero-l"><div class="rgp-hi">'+(names[role]||'Dashboard')+'</div><h2>Welcome back'+(who?(', '+esc2(who)):'')+'</h2><p>Here is how things are performing today.</p></div><div class="rgp-acts">'+acts+'</div></div>';
+  }
+  var PAID=function(b){ return b.status==='confirmed'||b.status==='completed'; };
+
+  async function renderAdmin(m){
+    var res=await Promise.all([ apiGet('/api/admin/overview'), safeArr('/api/bookings') ]);
+    var o=res[0]||{}, bk=(res[1]||[]).slice().sort(function(a,c){ return num(c.id)-num(a.id); });
+    var months=lastMonths(6);
+    var rev=months.map(function(mo){ return { label:mo.label, value:bk.filter(function(b){ return PAID(b)&&mkey(b.created_at)===mo.key; }).reduce(function(s,b){ return s+num(b.amount); },0) }; });
+    var cnt=months.map(function(mo){ return bk.filter(function(b){ return mkey(b.created_at)===mo.key; }).length; });
+    var done=bk.filter(PAID).length;
+    var avg=done?num(o.revenue)/done:0;
+    m.innerHTML='<div class="rgp">'+hero('admin')
+      +'<div class="rgp-kpis">'
+      +kpi({icon:'wallet',tone:'green',label:'Revenue',value:money2(o.revenue),trend:trend(rev[5].value,rev[4].value),spark:spark(rev.map(function(r){return r.value;}),'green')})
+      +kpi({icon:'ticket',tone:'blue',label:'Bookings',value:(o.bookings!=null?o.bookings:bk.length),trend:trend(cnt[5],cnt[4]),spark:spark(cnt,'blue')})
+      +kpi({icon:'sparkles',tone:'gold',label:'Avg booking value',value:money2(avg)})
+      +kpi({icon:'sparkles',tone:'gold',label:'Platform commission',value:money2(o.platform_commission)})
+      +kpi({icon:'wallet',tone:(num(o.pending_payouts)>0?'red':'blue'),label:'Pending payouts',value:num(o.pending_payouts)})
+      +kpi({icon:'store',tone:'blue',label:'Providers',value:num(o.vendors)})
+      +kpi({icon:'megaphone',tone:'blue',label:'Marketers',value:num(o.affiliates)})
+      +kpi({icon:'users',tone:'blue',label:'Customers',value:num(o.customers)})
+      +kpi({icon:'compass',tone:'blue',label:'Services',value:num(o.services)})
+      +'</div>'
+      +'<div class="rgp-panels">'
+      +panel('Revenue','Last 6 months · confirmed &amp; completed',barChart(rev,'green'))
+      +panel('Bookings by status','All-time distribution',breakdown(bk))
+      +'</div>'
+      +'<div class="rgp-panels">'
+      +panel('Recent bookings','Latest activity',bookingsTable2(bk.slice(0,6)))
+      +panel('Top marketers','By bookings &amp; clicks',tbl2(['Name','Code','Clicks','Bookings'],(o.top_affiliates||[]).map(function(a){ return [esc2(a.name),'<code>'+esc2(a.code)+'</code>',a.clicks,a.bookings]; })))
+      +'</div></div>';
+  }
+
+  async function renderVendor(m){
+    var res=await Promise.all([ safeArr('/api/bookings'), safeObj('/api/wallets/me',{balance:0}), safeArr('/api/services'), safeObj('/api/vendors/me',null) ]);
+    var bk=(res[0]||[]).slice().sort(function(a,c){ return num(c.id)-num(a.id); });
+    var w=res[1]||{balance:0}, all=res[2]||[], me=res[3];
+    var mine=me?all.filter(function(s){ return s.vendor_id===me.id; }):all;
+    var months=lastMonths(6);
+    var rev=months.map(function(mo){ return { label:mo.label, value:bk.filter(function(b){ return PAID(b)&&mkey(b.created_at)===mo.key; }).reduce(function(s,b){ return s+num(b.amount); },0) }; });
+    var cnt=months.map(function(mo){ return bk.filter(function(b){ return mkey(b.created_at)===mo.key; }).length; });
+    var gross=bk.reduce(function(s,b){ return s+num(b.amount); },0);
+    var pending=bk.filter(function(b){ return b.status==='pending'; }).length;
+    var completed=bk.filter(function(b){ return b.status==='completed'; }).length;
+    var rate=bk.length?Math.round((completed/bk.length)*100):0;
+    var rated=mine.filter(function(s){ return num(s.rating)>0; });
+    var avgR=rated.length?Math.round((rated.reduce(function(s,x){ return s+num(x.rating); },0)/rated.length)*10)/10:0;
+    m.innerHTML='<div class="rgp">'+hero('vendor')
+      +'<div class="rgp-kpis">'
+      +kpi({icon:'wallet',tone:'green',label:'Gross sales',value:money2(gross),trend:trend(rev[5].value,rev[4].value),spark:spark(rev.map(function(r){return r.value;}),'green')})
+      +kpi({icon:'ticket',tone:'blue',label:'Bookings',value:bk.length,trend:trend(cnt[5],cnt[4]),spark:spark(cnt,'blue')})
+      +kpi({icon:'wallet',tone:'gold',label:'Wallet balance',value:money2(w.balance)})
+      +kpi({icon:'compass',tone:'blue',label:'My services',value:mine.length})
+      +kpi({icon:'store',tone:(pending>0?'red':'blue'),label:'Pending',value:pending})
+      +kpi({icon:'star',tone:'gold',label:'Avg rating',value:(avgR?('★ '+avgR):'—')})
+      +'</div>'
+      +'<div class="rgp-panels">'
+      +panel('Revenue','Last 6 months',barChart(rev,'green'))
+      +panel('Bookings by status','All-time · '+rate+'% completed',breakdown(bk))
+      +'</div>'
+      +panel('Recent bookings','Latest activity',bookingsTable2(bk.slice(0,8)))
+      +'</div>';
+  }
+
+  async function renderAffiliate(m){
+    var res=await Promise.all([ safeObj('/api/affiliates/me',{clicks:0}), safeArr('/api/bookings'), safeObj('/api/wallets/me',{balance:0,transactions:[]}) ]);
+    var a=res[0]||{clicks:0}, bk=(res[1]||[]).slice().sort(function(x,y){ return num(y.id)-num(x.id); }), w=res[2]||{balance:0,transactions:[]};
+    var months=lastMonths(6);
+    var earn=months.map(function(mo){ return { label:mo.label, value:(w.transactions||[]).filter(function(t){ return num(t.amount)>0&&mkey(t.created_at)===mo.key; }).reduce(function(s,t){ return s+num(t.amount); },0) }; });
+    var cnt=months.map(function(mo){ return bk.filter(function(b){ return mkey(b.created_at)===mo.key; }).length; });
+    var conv=num(a.clicks)?Math.round((bk.length/num(a.clicks))*100):0;
+    m.innerHTML='<div class="rgp">'+hero('affiliate')
+      +'<div class="rgp-kpis">'
+      +kpi({icon:'wallet',tone:'green',label:'Earnings',value:money2(w.balance),trend:trend(earn[5].value,earn[4].value),spark:spark(earn.map(function(r){return r.value;}),'green')})
+      +kpi({icon:'ticket',tone:'blue',label:'Bookings',value:bk.length,trend:trend(cnt[5],cnt[4]),spark:spark(cnt,'blue')})
+      +kpi({icon:'link',tone:'gold',label:'Clicks',value:num(a.clicks)})
+      +kpi({icon:'sparkles',tone:'blue',label:'Conversion',value:conv+'%'})
+      +'</div>'
+      +'<div class="rgp-panels">'
+      +panel('Earnings','Last 6 months',barChart(earn,'green'))
+      +panel('Bookings by status','All-time',breakdown(bk))
+      +'</div>'
+      +panel('Recent bookings','Latest activity',bookingsTable2(bk.slice(0,8)))
+      +'</div>';
+  }
+
+  function currentRole(){
+    var t=(document.getElementById('dash-title')||{}).textContent||'';
+    if(/Admin/i.test(t)) return 'admin';
+    if(/Provider/i.test(t)) return 'vendor';
+    if(/Marketer/i.test(t)) return 'affiliate';
+    return '';
+  }
+  function currentSection(){
+    var b=document.querySelector('#dnav button.on');
+    if(!b) return '';
+    var s=b.querySelector('span');
+    return (s?s.textContent:(b.textContent||'')).trim().toLowerCase();
+  }
+
+  function install(){
+    if(window.__ragoDpInstalled) return true;
+    if(typeof window.loadSec!=='function') return false;
+    injectStyles();
+    var _orig=window.loadSec;
+    window.loadSec=async function(){
+      var role=currentRole(), sec=currentSection();
+      if(sec==='overview' && (role==='admin'||role==='vendor'||role==='affiliate')){
+        var m=document.getElementById('dmain');
+        if(m){
+          try{
+            m.innerHTML='<p class="muted">Loading...</p>';
+            if(role==='admin'){ await renderAdmin(m); return; }
+            if(role==='vendor'){ await renderVendor(m); return; }
+            await renderAffiliate(m); return;
+          }catch(e){}
+        }
+      }
+      return _orig.apply(this, arguments);
+    };
+    window.__ragoDpInstalled=true;
+    return true;
+  }
+  if(!install()){
+    var tries=0;
+    var iv=setInterval(function(){ if(install()||++tries>100) clearInterval(iv); }, 120);
+  }
+})();
