@@ -30,6 +30,22 @@ export const routes = [
   },
   {
     method: "GET",
+    path: "/api/admin/services",
+    auth: ["admin"],
+    handler: ({ query }) => {
+      let sql =
+        "SELECT s.*, v.name vendor_name FROM services s LEFT JOIN vendors v ON v.id=s.vendor_id"
+      const p = []
+      if (query.status) {
+        sql += " WHERE s.status=?"
+        p.push(query.status)
+      }
+      sql += " ORDER BY s.id DESC"
+      return all(sql, ...p)
+    },
+  },
+  {
+    method: "GET",
     path: "/api/admin/settings",
     auth: ["admin"],
     handler: () => all("SELECT key, value FROM settings ORDER BY key"),
