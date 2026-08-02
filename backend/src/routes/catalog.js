@@ -90,6 +90,21 @@ export const routes = [
 		},
 	},
 	{
+		method: "GET",
+		path: "/api/my-services",
+		auth: ["vendor", "admin"],
+		handler: ({ user }) => {
+			if (user.role === "admin")
+				return all("SELECT * FROM services ORDER BY id DESC").map(withImages)
+			const v = get("SELECT id FROM vendors WHERE user_id=?", user.id)
+			if (!v) return []
+			return all(
+				"SELECT * FROM services WHERE vendor_id=? ORDER BY id DESC",
+				v.id,
+			).map(withImages)
+		},
+	},
+	{
 		method: "POST",
 		path: "/api/services",
 		auth: ["vendor", "admin"],
@@ -102,12 +117,13 @@ export const routes = [
 			const cat = body.category_key
 				? get("SELECT id FROM categories WHERE key=?", body.category_key)
 				: null
+			const status = user.role === "admin" ? body.status || "active" : "pending"
 			const info = run(
 				"INSERT INTO services (vendor_id,category_id,title,location,description,price,currency,duration,rating,reviews_count,featured,cancel_policy,status,meta,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 				vendor.id, cat ? cat.id : null, body.title || "Untitled",
 				body.location || null, body.description || null, Number(body.price) || 0,
 				body.currency || "USD", body.duration || null, 0, 0,
-				body.featured ? 1 : 0, body.cancel_policy || null, body.status || "active",
+				body.featured ? 1 : 0, body.cancel_policy || null, status,
 				metaString(body.meta),
 				new Date().toISOString(),
 			)
